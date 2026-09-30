@@ -8,9 +8,27 @@ let cachedProfile=null;
 
 function currentShift(){const h=new Date().getHours();return h>=6&&h<14?"A Shift":h>=14&&h<22?"B Shift":"C Shift"}
 function shiftState(name){const h=new Date().getHours()+new Date().getMinutes()/60;const s=shifts.find(x=>x.name===name);let start=+s.start.slice(0,2)+ +s.start.slice(3)/60,end=+s.end.slice(0,2)+ +s.end.slice(3)/60;if(name==="C Shift"){return h>=22||h<6?"Running":h>=6?"Pending":"Completed"}return h>=end?"Completed":h>=start?"Running":"Pending"}
-function api(action,data={},method="POST"){if(!API||API.includes("PASTE_NEW"))return Promise.reject(new Error("API URL missing"));const p={action,...data};if(method==="GET"){const u=new URL(API);u.searchParams.set("api","1");u.searchParams.set("action",action);Object.entries(data).forEach(([k,v])=>u.searchParams.set(k,typeof v==="string"?v:JSON.stringify(v)));return fetch(u,{redirect:"follow"}).then(r=>r.json())}return fetch(API,{method:"POST",redirect:"follow",headers:{"Content-Type":"text/plain;charset=utf-8"},body:JSON.stringify(p)}).then(r=>r.json())}
+function api(action,data={},method="GET"){
+  if(!API||API.includes("PASTE_NEW"))return Promise.reject(new Error("API URL missing"));
+  return new Promise((resolve,reject)=>{
+    const cb="__sanraksh_cb_"+Date.now()+"_"+Math.floor(Math.random()*100000);
+    const u=new URL(API);
+    u.searchParams.set("api","1");
+    u.searchParams.set("action",action);
+    u.searchParams.set("prefix",cb);
+    Object.entries(data||{}).forEach(([k,v])=>{
+      if(v!==undefined&&v!==null)u.searchParams.set(k,typeof v==="string"?v:JSON.stringify(v));
+    });
+    const s=document.createElement("script");
+    const timer=setTimeout(()=>{cleanup();reject(new Error("API timeout"));},20000);
+    function cleanup(){clearTimeout(timer);delete window[cb];s.remove();}
+    window[cb]=(result)=>{cleanup();resolve(result)};
+    s.onerror=()=>{cleanup();reject(new Error("API request failed"))};
+    s.src=u.toString();
+    document.body.appendChild(s);
+  });
+}
 function setMessage(id,msg,good=false){$(id).textContent=msg;$(id).style.color=good?"#16813b":"#c62828"}
-function fillLoginClock(){const d=new Date();$("loginDate").textContent=d.toLocaleDateString("en-GB",{day:"2-digit",month:"2-digit",year:"numeric"});$("loginShift").textContent=currentShift()+" • "+(shifts.find(x=>x.name===currentShift())?.start||"")+" - "+(shifts.find(x=>x.name===currentShift())?.end||"")}
 function showScreen(id){["loginScreen","setupScreen","profileScreen","forgotScreen","appScreen"].forEach(x=>$(x).classList.add("hidden"));$(id).classList.remove("hidden")}
 function toggleEye(){const x=$("loginPassword");x.type=x.type==="password"?"text":"password"}
 async function login(){
@@ -123,7 +141,6 @@ function aboutPage(){renderShell("about","About","BSL (HRCF) - SANRAKSH");$("con
 async function syncPage(){renderShell("sync","Sync Data","Offline records");$("content").innerHTML='<div class="panel sync-card"><h2>☁ Sync Data</h2><p>Pending records: <b>0</b></p><p>Automatic synchronization will be enabled with the offline queue in the next build step.</p></div>'}
 
 document.addEventListener("DOMContentLoaded",()=>{
- fillLoginClock();setInterval(fillLoginClock,30000);
  $("loginForm").onsubmit=e=>{e.preventDefault();login()};$("togglePassword").onclick=toggleEye;$("newUserBtn").onclick=newUser;$("forgotBtn").onclick=forgot;$("resetBtn").onclick=resetPassword;$("forgotBack").onclick=()=>showScreen("loginScreen");$("setupBack").onclick=()=>showScreen("loginScreen");$("setupPass").oninput=passwordRules;$("createPasswordBtn").onclick=createPassword;$("profileType").onchange=loadDesignations;$("saveProfileBtn").onclick=saveProfile;$("profileHomeBtn").onclick=continueHome;$("logoutBtn").onclick=logout;$("menuBtn").onclick=()=>$("sidebar").classList.toggle("open");document.querySelectorAll("#nav button").forEach(b=>b.onclick=()=>openPage(b.dataset.page));
  if(session){openProfile(true)}else showScreen("loginScreen");
 });
