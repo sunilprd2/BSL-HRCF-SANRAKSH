@@ -1,67 +1,101 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-  <meta name="theme-color" content="#005bbb">
-  <meta name="description" content="BSL (HRCF) - SANRAKSH Maintenance Log System">
-  <link rel="manifest" href="manifest.webmanifest">
-  <link rel="stylesheet" href="styles.css">
-  <title>BSL (HRCF) - SANRAKSH</title>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#075fc5">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="sanraksh-icon.png">
+<link rel="stylesheet" href="styles.css">
+<title>BSL (HRCF) - SANRAKSH</title>
 </head>
 <body>
-  <div id="app">
-    <section id="loginScreen" class="login-screen">
-      <div class="login-overlay"></div>
-      <div class="login-card">
-        <div class="logo-mark">◆</div>
-        <div class="brand-small">सेल SAIL</div>
-        <h1>BSL (HRCF)<br><span>SANRAKSH</span></h1>
-        <p>Maintenance Log System</p>
-        <form id="loginForm">
-          <label>Staff No</label>
-          <input id="loginStaffNo" inputmode="numeric" maxlength="6" placeholder="Staff No" required>
-          <label>Password</label>
-          <div class="password-box">
-            <input id="loginPassword" type="password" placeholder="Password" required>
-            <button type="button" id="togglePassword">◉</button>
-          </div>
-          <button class="primary full" type="submit">Login</button>
-          <button class="link-btn" type="button" id="forgotBtn">Forgot Password?</button>
-          <div id="loginMessage" class="message"></div>
-        </form>
-      </div>
-    </section>
-
-    <section id="appScreen" class="hidden app-shell">
-      <aside id="sidebar" class="sidebar">
-        <div class="sidebar-brand">
-          <div class="logo-mark small">◆</div>
-          <div><b>BSL (HRCF)</b><strong>SANRAKSH</strong><small>Maintenance Log System</small></div>
-        </div>
-        <nav id="nav">
-          <button data-page="home">⌂ <span>Home</span></button>
-          <button data-page="addLog">▣ <span>Add Log</span></button>
-          <button data-page="logs">▤ <span>View Logs</span></button>
-          <button data-page="employees">♟ <span>Employee Details</span></button>
-          <button data-page="shifts">▦ <span>Shift Details</span></button>
-          <button data-page="reports">▥ <span>Reports</span></button>
-          <button data-page="about">ⓘ <span>About</span></button>
-          <button data-page="sync">☁ <span>Sync Data</span><b class="badge">0</b></button>
-        </nav>
-        <button id="logoutBtn" class="logout">Logout</button>
-      </aside>
-
-      <main class="main">
-        <header class="topbar">
-          <button id="menuBtn" class="icon-btn">☰</button>
-          <div class="top-title">BSL (HRCF) - SANRAKSH<br><small>Maintenance Log System</small></div>
-          <div class="user-icon">●</div>
-        </header>
-        <div id="content" class="content"></div>
-      </main>
-    </section>
+<div id="loginScreen" class="login-screen">
+  <div class="login-bg"></div>
+  <div class="login-top">
+    <div class="mini-brand"><img src="sanraksh-icon.png"><div><b>BSL (HRCF)</b><strong>SANRAKSH</strong><small>Maintenance Log System</small></div></div>
+    <div class="great-place">★ GREAT PLACE<br><span>TO WORK</span></div>
   </div>
-  <script src="app.js"></script>
+  <div class="login-date"><b id="loginDate"></b><span id="loginShift"></span></div>
+  <div class="login-card">
+    <div class="login-card-logo"><img src="sanraksh-icon.png"></div>
+    <h1>BSL (HRCF)<br><span>SANRAKSH</span></h1>
+    <p>Maintenance Log System</p>
+    <form id="loginForm">
+      <label>Staff No</label>
+      <input id="loginStaffNo" maxlength="6" inputmode="numeric" placeholder="Enter 6 digit Staff No" required>
+      <label>Password</label>
+      <div class="password-row"><input id="loginPassword" type="password" placeholder="Enter Password" required><button type="button" id="togglePassword">◉</button></div>
+      <button class="primary full" type="submit">Login</button>
+      <div class="login-links"><button type="button" id="newUserBtn">New User</button><button type="button" id="forgotBtn">Forgot Password?</button></div>
+      <div id="loginMsg" class="message"></div>
+    </form>
+  </div>
+</div>
+
+<div id="setupScreen" class="hidden setup-screen">
+  <div class="setup-card">
+    <div class="setup-heading" id="setupTitle">Create Password</div>
+    <div class="setup-sub">First-time users must create a password before entering SANRAKSH.</div>
+    <div id="setupMsg" class="message"></div>
+    <label>Staff No</label><input id="setupStaff" readonly>
+    <label>New Password</label><input id="setupPass" type="password">
+    <label>Confirm Password</label><input id="setupConfirm" type="password">
+    <div class="rules"><div id="r1">✗ Minimum 8 characters</div><div id="r2">✗ One capital letter</div><div id="r3">✗ One small letter</div><div id="r4">✗ One number</div><div id="r5">✗ One special character</div></div>
+    <div class="form-actions"><button class="secondary" id="setupBack">Back</button><button class="primary" id="createPasswordBtn">Create Password</button></div>
+  </div>
+</div>
+
+<div id="profileScreen" class="hidden setup-screen">
+  <div class="setup-card profile-setup">
+    <div class="setup-heading">Employee Details</div>
+    <div class="setup-sub">Your saved employee details are shown below. Fill them only once; later logins will load the saved values.</div>
+    <div id="profileMsg" class="message"></div>
+    <div class="form-grid">
+      <div><label>Staff No</label><input id="profileStaffNo" readonly></div>
+      <div><label>Employee Name</label><input id="profileName" readonly></div>
+      <div><label>Department *</label><select id="profileDepartment"></select></div>
+      <div><label>Mobile No *</label><input id="profileMobile" maxlength="10" inputmode="numeric"></div>
+      <div><label>Employee Type *</label><select id="profileType"><option value="">Select</option><option>Executive</option><option>Non-Executive</option><option>Contract Worker</option></select></div>
+      <div><label>Designation *</label><select id="profileDesignation"><option value="">Select Designation</option></select></div>
+      <div><label>Email</label><input id="profileEmail" type="email" readonly></div>
+    </div>
+    <div class="form-actions"><button class="secondary" id="profileHomeBtn">Continue to Home</button><button class="primary" id="saveProfileBtn">Save / Update</button></div>
+  </div>
+</div>
+
+<div id="forgotScreen" class="hidden setup-screen">
+  <div class="setup-card">
+    <div class="setup-heading">Forgot Password</div>
+    <div class="setup-sub">Submit a reset request to the administrator.</div>
+    <label>Staff No</label><input id="forgotStaff" maxlength="6" inputmode="numeric">
+    <div id="forgotMsg" class="message"></div>
+    <div class="form-actions"><button class="secondary" id="forgotBack">Back</button><button class="primary" id="resetBtn">Send Request</button></div>
+  </div>
+</div>
+
+<div id="appScreen" class="hidden app-shell">
+  <aside id="sidebar" class="sidebar">
+    <div class="sidebar-brand"><img src="sanraksh-icon.png"><div><b>BSL (HRCF)</b><strong>SANRAKSH</strong><small>Maintenance Log System</small></div></div>
+    <nav id="nav">
+      <button data-page="home">⌂ <span>Home</span></button>
+      <button data-page="addLog">▣ <span>Add Log</span></button>
+      <button data-page="logs">▤ <span>View Logs</span></button>
+      <button data-page="employees">♟ <span>Employee Details</span></button>
+      <button data-page="shifts">▦ <span>Shift Details</span></button>
+      <button data-page="reports">▥ <span>Reports</span></button>
+      <button data-page="about">ⓘ <span>About</span></button>
+      <button data-page="sync">☁ <span>Sync Data</span><b id="syncBadge" class="badge">0</b></button>
+    </nav>
+    <button id="logoutBtn" class="logout">Logout</button>
+  </aside>
+  <main class="main">
+    <header class="topbar"><button id="menuBtn" class="icon-btn">☰</button><div id="topTitle" class="top-title">BSL (HRCF) - SANRAKSH<br><small>Maintenance Log System</small></div><div id="topUser" class="top-user">●</div></header>
+    <div id="content" class="content"></div>
+  </main>
+</div>
+
+<script src="config.js"></script>
+<script src="app.js"></script>
 </body>
 </html>

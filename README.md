@@ -1,35 +1,34 @@
-# BSL (HRCF) - SANRAKSH
+# BSL (HRCF) - SANRAKSH — GitHub V2
 
-## GitHub project started from scratch
+This is the new GitHub/PWA build started from scratch.
 
-This is a clean front-end/PWA foundation based on the supplied SANRAKSH mobile design reference.
+## Implemented in this build
+- Dynamic A/B/C shift status based on current time.
+- All three shifts shown in Home and Shift Details.
+- Shift cards are colour coded.
+- Shift in-charge name and mobile are read from the Employees master.
+- All shift filters include A, B, C and All Shifts.
+- View Logs has working Edit flow.
+- Add Log retrieves Area and Equipment masters from Google Sheets through the API.
+- Total Time is automatically calculated from Start/End Time.
+- Reports include Time split into Time and Total Time.
+- Login authentication reads Users sheet only.
+- New User activates an existing Staff No from Users when its password is blank.
+- First-time password creation.
+- After login, Employee Details loads the saved Employees-sheet profile.
+- Staff No and Employee Name are read-only in the app.
+- Department, Mobile, Employee Type and Designation can be updated by the employee.
+- Employee Name changes only when the Users master is changed.
+- PWA manifest/service worker included.
+- Industrial background and SANRAKSH visual assets included.
 
-### Included
-- Login screen
-- Home dashboard
-- A/B/C shift cards with in-charge and mobile
-- Sidebar navigation
-- Shift Details + Edit
-- Add Maintenance Log
-- Automatic Total Time calculation
-- View Logs
-- Employee Details
-- Reports
-- Sync Data / offline queue foundation
-- About
-- PWA manifest and service worker
+## Google Apps Script API
+`Code.gs` is a separate backend for this new GitHub build. It must be deployed as a Web App and connected to the same Google Sheet used by the completed system.
 
-### Important
-This starter project is intentionally independent of the existing Google Apps Script system.
+Before deployment:
+1. Put the Google Spreadsheet ID into `SPREADSHEET_ID`.
+2. Deploy as Web app.
+3. Copy the `/exec` URL into `config.js` as `API_URL`.
+4. Commit `config.js`.
 
-Do NOT delete the existing Google Sheet, Apps Script deployment, or final backup ZIP.
-
-### Next development phases
-1. Connect real Google Apps Script API
-2. Real Users-sheet authentication
-3. First-time employee profile setup and saved profile loading
-4. Real Employees / Shifts / Logs data
-5. Offline IndexedDB queue and automatic sync
-6. Real PDF report
-7. Android packaging (PWA/TWA)
-8. Final GitHub deployment
+Do not delete the old working Apps Script deployment or its backup.
