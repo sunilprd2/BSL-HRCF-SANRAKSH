@@ -1,0 +1,9 @@
+{
+  "name":"BSL (HRCF) - SANRAKSH Maintenance Log System",
+  "short_name":"SANRAKSH",
+  "start_url":"./",
+  "display":"standalone",
+  "background_color":"#f3f7fc",
+  "theme_color":"#075fc5",
+  "icons":[]
+}

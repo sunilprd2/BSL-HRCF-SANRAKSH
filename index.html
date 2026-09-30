@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#005bbb">
+  <meta name="description" content="BSL (HRCF) - SANRAKSH Maintenance Log System">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="stylesheet" href="styles.css">
+  <title>BSL (HRCF) - SANRAKSH</title>
+</head>
+<body>
+  <div id="app">
+    <section id="loginScreen" class="login-screen">
+      <div class="login-overlay"></div>
+      <div class="login-card">
+        <div class="logo-mark">◆</div>
+        <div class="brand-small">सेल SAIL</div>
+        <h1>BSL (HRCF)<br><span>SANRAKSH</span></h1>
+        <p>Maintenance Log System</p>
+        <form id="loginForm">
+          <label>Staff No</label>
+          <input id="loginStaffNo" inputmode="numeric" maxlength="6" placeholder="Staff No" required>
+          <label>Password</label>
+          <div class="password-box">
+            <input id="loginPassword" type="password" placeholder="Password" required>
+            <button type="button" id="togglePassword">◉</button>
+          </div>
+          <button class="primary full" type="submit">Login</button>
+          <button class="link-btn" type="button" id="forgotBtn">Forgot Password?</button>
+          <div id="loginMessage" class="message"></div>
+        </form>
+      </div>
+    </section>
+
+    <section id="appScreen" class="hidden app-shell">
+      <aside id="sidebar" class="sidebar">
+        <div class="sidebar-brand">
+          <div class="logo-mark small">◆</div>
+          <div><b>BSL (HRCF)</b><strong>SANRAKSH</strong><small>Maintenance Log System</small></div>
+        </div>
+        <nav id="nav">
+          <button data-page="home">⌂ <span>Home</span></button>
+          <button data-page="addLog">▣ <span>Add Log</span></button>
+          <button data-page="logs">▤ <span>View Logs</span></button>
+          <button data-page="employees">♟ <span>Employee Details</span></button>
+          <button data-page="shifts">▦ <span>Shift Details</span></button>
+          <button data-page="reports">▥ <span>Reports</span></button>
+          <button data-page="about">ⓘ <span>About</span></button>
+          <button data-page="sync">☁ <span>Sync Data</span><b class="badge">0</b></button>
+        </nav>
+        <button id="logoutBtn" class="logout">Logout</button>
+      </aside>
+
+      <main class="main">
+        <header class="topbar">
+          <button id="menuBtn" class="icon-btn">☰</button>
+          <div class="top-title">BSL (HRCF) - SANRAKSH<br><small>Maintenance Log System</small></div>
+          <div class="user-icon">●</div>
+        </header>
+        <div id="content" class="content"></div>
+      </main>
+    </section>
+  </div>
+  <script src="app.js"></script>
+</body>
+</html>
