@@ -185,6 +185,14 @@ async function employeesPage(){
 }
 async function reportsPage(){
  renderShell("reports","Reports","Daily shift maintenance report");
+ const rs=document.createElement("style"); rs.id="reportScreenStyle"; rs.textContent=`
+  .report-filter .field label{font-size:11px!important}
+  .report-filter .field input,.report-filter .field select,.report-filter button{font-size:11px!important}
+  .report-meta td{font-size:11px!important;line-height:1.25!important;padding:7px!important}
+  .report-meta b{font-size:11px!important}
+  .report-stat{font-size:11px!important}
+  .report-table th,.report-table td{font-size:13px!important;line-height:1.35!important}
+ `; document.getElementById("reportScreenStyle")?.remove(); document.head.appendChild(rs);
  $("content").innerHTML=`<h1 class="page-title">Reports</h1>
  <div class="panel report-filter">
   <div class="field"><label>Select Date</label><input id="rd" type="date" value="${today()}"></div>
@@ -213,7 +221,7 @@ async function loadReport(){
  document.getElementById("reportPrintStyle")?.remove();
  const ps=document.createElement("style");ps.id="reportPrintStyle";
  ps.textContent=`@media print{
-  @page{size:A4 landscape;margin:7mm}
+  @page{size:A4 portrait;margin:8mm}
   body{font-size:11px!important;background:#fff!important}
   .sidebar,.topbar,#nav,.report-filter,.report-actions,.page-title,.menu-btn{display:none!important}
   .main{margin:0!important;width:100%!important}
@@ -225,7 +233,7 @@ async function loadReport(){
   .report-stat strong{font-size:16px!important}
   .report-table{width:100%!important;table-layout:fixed!important;border-collapse:collapse!important;font-size:13px!important}
   .report-table th,.report-table td{font-size:13px!important;padding:8px 7px!important;line-height:1.4!important;word-break:break-word!important;white-space:normal!important;border:1px solid #aaa!important}
-  .report-table th:nth-child(1){width:20%}.report-table th:nth-child(2){width:15%}.report-table th:nth-child(3){width:15%}.report-table th:nth-child(4){width:18%}.report-table th:nth-child(5){width:18%}.report-table th:nth-child(6){width:10%}
+  .report-table th:nth-child(1){width:13%}.report-table th:nth-child(2){width:11%}.report-table th:nth-child(3){width:13%}.report-table th:nth-child(4){width:13%}.report-table th:nth-child(5){width:20%}.report-table th:nth-child(6){width:20%}.report-table th:nth-child(7){width:10%}
   .coil-input{border:0!important;background:transparent!important;padding:0!important;font-size:11px!important}
  }`;
  document.head.appendChild(ps);
@@ -255,7 +263,8 @@ function saveReportPdf(){
  const coils={sl1:$("coilSL1")?.value||"",sl2:$("coilSL2")?.value||""};
  try{localStorage.setItem(`sanraksh_coils_${d}_${s}`,JSON.stringify(coils))}catch(e){}
  const old=document.title;
- document.title=`${d.split("-").reverse().join("-")}_${s}_Maintenance Report`;
+ const fileDate=d.split("-").reverse().join("-");
+ document.title=`${fileDate}_${s}_Maintenance Report`;
  window.print();
  setTimeout(()=>document.title=old,1000);
 }
