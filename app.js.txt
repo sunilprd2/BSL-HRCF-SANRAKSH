@@ -90,7 +90,24 @@ async function shiftDetailsPage(forceShift=""){
  const data=await api("allShiftCrew",{date:today()},"GET").catch(()=>[]);
  $("content").innerHTML=`<h1 class="page-title">Shift Details</h1><div class="panel"><label>Date</label><input type="date" value="${today()}" id="shiftDate"></div>${shifts.map(s=>{const x=(Array.isArray(data)?data:[]).find(y=>y.shiftName===s.name)||{};return `<div class="shift-detail ${s.cls}"><div style="display:flex;justify-content:space-between;align-items:center"><h3>${s.name} (${s.start} - ${s.end})</h3><button class="primary" onclick="editShift('${s.name}')">Edit</button></div><div class="row"><div><b>Shift In-charge</b><div>${esc(x.shiftIncharge||"Not entered")}</div></div><div><b>Line In-charge</b><div>${esc(x.lineIncharge||"Not entered")}</div></div></div><div class="row"><div><b>BSL Employees</b><div>${x.bslEmployees||0}</div></div><div><b>Contract Workers</b><div>${x.contractWorkers||0} • Total ${x.totalCrew||0}</div></div></div></div>`}).join("")}`;
 }
-async function editShift(name){const data=await api("shiftCrew",{date:today(),shift:name},"GET").catch(()=>({}));$("content").innerHTML=`<h1 class="page-title">Edit ${name}</h1><div class="panel"><div class="form-grid"><div><label>Shift</label><input readonly value="${name}"></div><div><label>Shift In-Charge *</label><input id="esIn" value="${esc(data.shiftIncharge||"")}"></div><div><label>Mobile No</label><input id="esPhone" maxlength="10" placeholder="From Employees master"></div><div><label>Line In-Charge</label><input id="esLine" value="${esc(data.lineIncharge||"")}"></div><div><label>BSL Employees *</label><input id="esBsl" type="number" value="${data.bslEmployees||0}"></div><div><label>Contract Workers *</label><input id="esCon" type="number" value="${data.contractWorkers||0}"></div></div><div class="form-actions"><button class="secondary" onclick="shiftDetailsPage()">Cancel</button><button class="primary" onclick="saveShift('${name}')">Update</button></div></div>`}
+async function editShift(name){
+ const data=await api("shiftCrew",{date:today(),shift:name},"GET").catch(()=>({}));
+ const emps=await api("employees",{},"GET").catch(()=>[]);
+ employees=Array.isArray(emps)?emps:[];
+ const opts=employees.map(e=>`<option value="${esc(e.name)}" data-mobile="${esc(e.mobile||"")}">${esc(e.name)}${e.staffNo?" — "+esc(e.staffNo):""}</option>`).join("");
+ $("content").innerHTML=`<h1 class="page-title">Edit ${name}</h1><div class="panel"><div class="form-grid">
+ <div><label>Shift</label><input readonly value="${name}"></div>
+ <div><label>Shift In-Charge *</label><select id="esIn" onchange="syncShiftMobile()"><option value="">Select Shift In-Charge</option>${opts}</select></div>
+ <div><label>Mobile No</label><input id="esPhone" readonly placeholder="From Employees master"></div>
+ <div><label>Line In-Charge</label><select id="esLine"><option value="">Select Line In-Charge</option>${opts}</select></div>
+ <div><label>BSL Employees *</label><input id="esBsl" type="number" value="${data.bslEmployees||0}"></div>
+ <div><label>Contract Workers *</label><input id="esCon" type="number" value="${data.contractWorkers||0}"></div>
+ </div><div class="form-actions"><button class="secondary" onclick="shiftDetailsPage()">Cancel</button><button class="primary" onclick="saveShift('${name}')">Update</button></div></div>`;
+ $("esIn").value=data.shiftIncharge||"";
+ $("esLine").value=data.lineIncharge||"";
+ syncShiftMobile();
+}
+function syncShiftMobile(){const s=$("esIn"),p=$("esPhone");if(!s||!p)return;const o=s.options[s.selectedIndex];p.value=o?.dataset.mobile||""}
 async function saveShift(name){const d={date:today(),shift:name,shiftIncharge:$("esIn").value,lineIncharge:$("esLine").value,bslEmployees:Number($("esBsl").value||0),contractWorkers:Number($("esCon").value||0),totalCrew:Number($("esBsl").value||0)+Number($("esCon").value||0),sessionToken:session?.sessionToken||"",staffNo:session?.staffNo||""};const r=await api("saveShiftCrew",{details:d});alert(r.message||"Updated");if(r.success)shiftDetailsPage()}
 
 async function loadMasters(){if(!areas.length)areas=await api("areas",{},"GET").catch(()=>[]);if(!equipment.length)equipment=await api("equipment",{},"GET").catch(()=>[])}
@@ -106,21 +123,20 @@ async function addLogPage(editLog=null){
  <div><label>End Time *</label><input id="logEnd" type="time" value="${esc(l.endTime)}"></div>
  <div><label>Total Time</label><input id="logTotal" class="total-time" readonly value="${fmtMin(totalMinutes(l.startTime,l.endTime))}"></div>
  <div><label>Shift *</label><select id="logShift">${["A Shift","B Shift","C Shift"].map(s=>`<option>${s}</option>`).join("")}</select></div>
- <div><label>Area *</label><select id="logArea" onchange="populateLogEquipmentByArea()"><option value="">Select Area</option>${areas.map(x=>`<option>${esc(typeof x==="string"?x:x.area||"")}</option>`).join("")}</select></div>
- <div><label>System / Subsystem *</label><select id="logEquipment"><option value="">Select System / Subsystem</option></select></div>
+ <div><label>Area *</label><select id="logArea"><option value="">Select Area</option>${areas.map(x=>`<option>${esc(typeof x==="string"?x:x.area||"")}</option>`).join("")}</select></div>
+ <div><label>Equipment *</label><select id="logEquipment"><option value="">Select Equipment</option>${[...new Set(equipment.map(x=>String(x.equipment||"").trim()).filter(Boolean))].map(x=>`<option value="${esc(x)}">${esc(x)}</option>`).join("")}</select></div>
  <div class="full-span"><label>Problem *</label><textarea id="logProblem">${esc(l.problem)}</textarea></div>
  <div class="full-span"><label>Solution</label><textarea id="logSolution">${esc(l.solution)}</textarea></div>
  <div><label>Status *</label><select id="logStatus"><option>Completed</option><option>Pending</option><option>Overlook</option></select></div>
  <div><label>Remark</label><textarea id="logRemarks">${esc(l.remarks)}</textarea></div>
  </div><div class="offline-note">📴 Offline mode is supported. If the connection is unavailable, the log will be queued and synchronized automatically when online.</div><div class="form-actions"><button class="secondary" onclick="openPage('logs')">Cancel</button><button class="primary" onclick="${editLog?"updateLog()":"saveLog()"}">${editLog?"Update Log":"Save Log"}</button></div></div>`;
- $("logShift").value=l.shift||currentShift();$("logArea").value=l.area||"";populateLogEquipmentByArea(l.equipment||"");$("logStatus").value=l.status||"Pending";
+ $("logShift").value=l.shift||currentShift();$("logArea").value=l.area||"";$("logEquipment").value=l.equipment||"";$("logStatus").value=l.status||"Pending";
  ["logStart","logEnd"].forEach(id=>$(id).addEventListener("change",()=>{$("logTotal").value=fmtMin(totalMinutes($("logStart").value,$("logEnd").value))}));
  window.__editingLog=editLog||null;
 }
 async function saveLog(){const log=readLogForm();if(!validateLog(log))return;try{const r=await api("saveLog",{log:{...log,staffNo:session.staffNo,sessionToken:session.sessionToken}});if(r.success){alert("Maintenance log saved successfully.");logsPage()}else alert(r.message)}catch(e){alert("Connection error. If offline, this version will queue the record in the next sync build.")}}
-function populateLogEquipmentByArea(selected=""){const area=$("logArea")?.value||"";const list=[];const seen=new Set();equipment.filter(x=>!area||String(x.area||"").trim()===area).forEach(x=>{const name=String(x.equipment||"").trim();if(name&&!seen.has(name)){seen.add(name);list.push(name)}});$("logEquipment").innerHTML='<option value="">Select System / Subsystem</option>'+list.map(x=>`<option value="${esc(x)}">${esc(x)}</option>`).join("");$("logEquipment").value=selected||""}
-function readLogForm(){return {logId:window.__editingLog?.logId||"",date:$("logDate").value,shift:$("logShift").value,startTime:$("logStart").value,endTime:$("logEnd").value,area:$("logArea").value,equipment:$("logEquipment").value,problem:$("logProblem").value.trim(),solution:$("logSolution").value.trim(),status:$("logStatus").value,remarks:$("logRemarks").value.trim()}}}
-function validateLog(l){if(!l.date||!l.startTime||!l.area||!l.equipment||!l.problem||!l.status){alert("Please fill all required fields.");return false}return true}return true}
+function readLogForm(){return {logId:window.__editingLog?.logId||"",date:$("logDate").value,shift:$("logShift").value,startTime:$("logStart").value,endTime:$("logEnd").value,area:$("logArea").value,equipment:$("logEquipment").value,problem:$("logProblem").value.trim(),solution:$("logSolution").value.trim(),status:$("logStatus").value,remarks:$("logRemarks").value.trim()}}
+function validateLog(l){if(!l.date||!l.startTime||!l.area||!l.equipment||!l.problem||!l.status){alert("Please fill all required fields.");return false}return true}
 async function updateLog(){const l=readLogForm();if(!validateLog(l))return;const r=await api("updateLog",{log:l,sessionToken:session.sessionToken,staffNo:session.staffNo});alert(r.message||"Updated");if(r.success)logsPage()}
 
 async function logsPage(){
@@ -133,12 +149,32 @@ async function logsPage(){
  window.__allLogs=xs;filterLogs();
 }
 function normShift(v){return String(v).replace(/\s*\(.*/,"")}
-function filterLogs(){const f=$("lf").value,t=$("lt").value,s=normShift($("ls").value);const xs=(window.__allLogs||[]).filter(x=>(!f||x.date>=f)&&(!t||x.date<=t)&&(!s||s==="All Shifts"||x.shift===s));$("logsTable").innerHTML=`<table class="data-table"><thead><tr><th>#</th><th>Time</th><th>Area</th><th>S/L / Equipment</th><th>Problem</th><th>Status</th><th>Edit</th></tr></thead><tbody>${xs.map((x,i)=>`<tr><td>${i+1}</td><td>${esc(x.startTime)} - ${esc(x.endTime)}</td><td>${esc(x.area)}</td><td>${esc(x.equipment)}</td><td>${esc(x.problem)}</td><td>${statusPill(x.status)}</td><td><button class="edit-btn" onclick='addLogPage(${JSON.stringify(x).replace(/'/g,"&#39;")})'>✎</button></td></tr>`).join("")||'<tr><td colspan="7">No logs found.</td></tr>'}</tbody></table>`}
+function filterLogs(){const f=$("lf").value,t=$("lt").value,s=normShift($("ls").value);const xs=(window.__allLogs||[]).filter(x=>(!f||x.date>=f)&&(!t||x.date<=t)&&(!s||s==="All Shifts"||x.shift===s));$("logsTable").innerHTML=`<table class="data-table"><thead><tr><th>#</th><th>Shift</th><th>Time</th><th>Total Time</th><th>Area</th><th>Equipment</th><th>Problem</th><th>Status</th><th>Edit</th></tr></thead><tbody>${xs.map((x,i)=>`<tr><td>${i+1}</td><td>${esc(x.shift)}</td><td>${esc(x.startTime)} - ${esc(x.endTime)}</td><td>${fmtMin(totalMinutes(x.startTime,x.endTime))}</td><td>${esc(x.area)}</td><td>${esc(x.equipment)}</td><td>${esc(x.problem)}</td><td>${statusPill(x.status)}</td><td><button class="edit-btn" onclick='addLogPage(${JSON.stringify(x).replace(/'/g,"&#39;")})'>✎</button></td></tr>`).join("")||'<tr><td colspan="9">No logs found.</td></tr>'}</tbody></table>`}
 
-async function employeesPage(){renderShell("employees","Employee Details","Employees master");const xs=await api("employees",{},"GET").catch(()=>[]);employees=xs; $("content").innerHTML=`<h1 class="page-title">Employee Details</h1><div class="panel table-wrap"><table class="data-table"><thead><tr><th>#</th><th>Staff No</th><th>Name</th><th>Department</th><th>Designation</th><th>Mobile No</th><th>Employee Type</th></tr></thead><tbody>${xs.map((x,i)=>`<tr><td>${i+1}</td><td>${esc(x.staffNo)}</td><td>${esc(x.name)}</td><td>${esc(x.department)}</td><td>${esc(x.designation)}</td><td>${esc(x.mobile)}</td><td>${esc(x.employeeType)}</td></tr>`).join("")||'<tr><td colspan="7">No employees found.</td></tr>'}</tbody></table></div>`}
-async function reportsPage(){renderShell("reports","Reports","Date / shift filter");$("content").innerHTML=`<h1 class="page-title">Reports</h1><div class="panel toolbar"><div class="field"><label>Date</label><input id="rd" type="date" value="${today()}"></div><div class="field"><label>Shift</label><select id="rs"><option>A Shift</option><option>B Shift</option><option>C Shift</option><option>All Shifts</option></select></div><button class="primary" onclick="loadReport()">Generate Report</button></div><div id="reportBox"></div>`;loadReport()}
+async function employeesPage(){
+ renderShell("employees","Employee Details","Employees master");
+ const xs=await api("employees",{},"GET").catch(()=>[]);
+ employees=Array.isArray(xs)?xs:[];
+ const typeKey=x=>String(x.employeeType||"").trim().toLowerCase();
+ const groups=[
+  {key:"executive",title:"Executive",cls:"exec",items:employees.filter(x=>typeKey(x)==="executive")},
+  {key:"non-executive",title:"Non-Executive",cls:"nonexec",items:employees.filter(x=>typeKey(x)==="non-executive")},
+  {key:"contract",title:"Contract Worker",cls:"contract",items:employees.filter(x=>typeKey(x)==="contract worker"||typeKey(x)==="contract")}
+ ];
+ const table=g=>g.items.map((x,i)=>`<div class="emp-row"><div class="emp-no">${i+1}</div><div><b>${esc(x.name)}</b><small>Staff No: ${esc(x.staffNo)}</small></div><div>${esc(x.department)}</div><div>${esc(x.designation)}</div><div>${esc(x.mobile)}</div></div>`).join("")||'<div class="emp-empty">No employees in this section.</div>';
+ $("content").innerHTML=`<h1 class="page-title">Employee Details</h1>
+ <style>
+ .emp-section{margin-bottom:18px;border-radius:10px;overflow:hidden;border:1px solid #d7e1ec;background:#fff;box-shadow:0 2px 8px rgba(0,0,0,.05)}
+ .emp-section-head{padding:12px 16px;font-size:18px;font-weight:700;color:#fff;display:flex;justify-content:space-between;align-items:center}
+ .emp-section-head.exec{background:#1769c2}.emp-section-head.nonexec{background:#198754}.emp-section-head.contract{background:#e58b16}
+ .emp-table-head,.emp-row{display:grid;grid-template-columns:55px 1.7fr 1.1fr 1.3fr 1.1fr;gap:12px;align-items:center;padding:10px 14px}
+ .emp-table-head{background:#f1f6fb;font-size:12px;font-weight:700;color:#194b80}.emp-row{border-top:1px solid #e6edf4;font-size:13px}.emp-row small{display:block;color:#718096;margin-top:2px}.emp-no{font-weight:700;color:#64748b}.emp-empty{padding:16px;color:#718096}
+ @media(max-width:800px){.emp-table-head,.emp-row{grid-template-columns:35px 1.5fr 1fr 1fr;}.emp-table-head div:nth-child(5),.emp-row>div:nth-child(5){display:none}}
+ </style>
+ ${groups.map(g=>`<section class="emp-section"><div class="emp-section-head ${g.cls}"><span>${g.title}</span><span>${g.items.length}</span></div><div class="emp-table-head"><div>#</div><div>Name / Staff No</div><div>Department</div><div>Designation</div><div>Mobile No</div></div>${table(g)}</section>`).join("")}`;
+}async function reportsPage(){renderShell("reports","Reports","Date / shift filter");$("content").innerHTML=`<h1 class="page-title">Reports</h1><div class="panel toolbar"><div class="field"><label>Select Date</label><input id="rd" type="date" value="${today()}"></div><div class="field"><label>Select Shift</label><select id="rs"><option>A Shift</option><option>B Shift</option><option>C Shift</option><option>All Shifts</option></select></div><button class="primary" onclick="loadReport()">Generate Report</button></div><div id="reportBox"></div>`;$("rs").value=currentShift();loadReport()}
 async function loadReport(){const d=$("rd").value,s=$("rs").value;$("reportBox").innerHTML='<div class="panel">Loading...</div>';let list=[];if(s==="All Shifts"){for(const sh of ["A Shift","B Shift","C Shift"]){const r=await api("report",{date:d,shift:sh},"GET").catch(()=>({logs:[]}));list.push(...(r.logs||[]))}}else{const r=await api("report",{date:d,shift:s},"GET").catch(()=>({logs:[]}));list=r.logs||[]}$("reportBox").innerHTML=`<div class="panel"><div class="report-actions"><button class="primary" onclick="window.print()">Print / PDF</button></div><div class="table-wrap"><table class="data-table report-table"><thead><tr><th>#</th><th>Date</th><th>Shift</th><th><div class="report-time"><div>Time</div><div>Total Time</div></div></th><th>Area</th><th>Equipment</th><th>Problem</th><th>Solution</th><th>Status</th><th>Remark</th></tr></thead><tbody>${list.map((x,i)=>`<tr><td>${i+1}</td><td>${esc(x.date)}</td><td>${esc(x.shift)}</td><td><div class="report-time"><div>${esc(x.startTime)} - ${esc(x.endTime)}</div><div>${fmtMin(totalMinutes(x.startTime,x.endTime))}</div></div></td><td>${esc(x.area)}</td><td>${esc(x.equipment)}</td><td>${esc(x.problem)}</td><td>${esc(x.solution)}</td><td>${statusPill(x.status)}</td><td>${esc(x.remarks)}</td></tr>`).join("")||'<tr><td colspan="10">No records.</td></tr>'}</tbody></table></div></div>`}
-function aboutPage(){renderShell("about","About","BSL (HRCF) - SANRAKSH");$("content").innerHTML='<div class="about-card"><img src="sanraksh-icon.png"><h2>BSL (HRCF) - SANRAKSH Maintenance Log System</h2><p>Digital maintenance log, shift crew, employee and daily report platform for HRCF.</p><p><b>Developed & Architected by</b><br>Sunil Kumar Parida<br>Junior Engineer | HRCF<br>SAIL / Bokaro Steel Plant (BSL)</p><p>Fill free to give your valuble feedback and suggection to imptove this website</p></div>'}
+function aboutPage(){renderShell("about","About","BSL (HRCF) - SANRAKSH");$("content").innerHTML='<div class="about-card"><img src="sanraksh-icon.png"><h2>BSL (HRCF) - SANRAKSH Maintenance Log System</h2><p>Digital maintenance log, shift crew, employee and daily report platform for HRCF.</p><p><b>Developed & Architected by</b><br>Sunil Kumar Parida<br>Junior Engineer | HRCF<br>SAIL / Bokaro Steel Plant (BSL)</p><p><b>Email:</b> <a href="mailto:sunilkumarparida.sail@gmail.com">sunilkumarparida.sail@gmail.com</a></p><p>Fill free to give your valuble feedback and suggection to imptove this website</p></div>'}
 async function syncPage(){renderShell("sync","Sync Data","Offline records");$("content").innerHTML='<div class="panel sync-card"><h2>☁ Sync Data</h2><p>Pending records: <b>0</b></p><p>Automatic synchronization will be enabled with the offline queue in the next build step.</p></div>'}
 
 document.addEventListener("DOMContentLoaded",()=>{
