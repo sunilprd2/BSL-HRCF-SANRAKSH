@@ -185,14 +185,6 @@ async function employeesPage(){
 }
 async function reportsPage(){
  renderShell("reports","Reports","Daily shift maintenance report");
- const rs=document.createElement("style"); rs.id="reportScreenStyle"; rs.textContent=`
-  .report-filter .field label{font-size:11px!important}
-  .report-filter .field input,.report-filter .field select,.report-filter button{font-size:11px!important}
-  .report-meta td{font-size:11px!important;line-height:1.25!important;padding:7px!important}
-  .report-meta b{font-size:11px!important}
-  .report-stat{font-size:11px!important}
-  .report-table th,.report-table td{font-size:13px!important;line-height:1.35!important}
- `; document.getElementById("reportScreenStyle")?.remove(); document.head.appendChild(rs);
  $("content").innerHTML=`<h1 class="page-title">Reports</h1>
  <div class="panel report-filter">
   <div class="field"><label>Select Date</label><input id="rd" type="date" value="${today()}"></div>
@@ -229,11 +221,11 @@ async function loadReport(){
   .report-page{border:1px solid #bbb!important;box-shadow:none!important;margin:0!important;padding:5mm!important}
   .report-title{font-size:18px!important;margin:2px 0 10px!important}
   .report-meta td{font-size:11px!important;padding:7px!important}
-  .report-stat{font-size:11px!important;padding:7px!important}
+  .report-stats{display:grid!important;grid-template-columns:repeat(4,1fr)!important;gap:7px!important;margin:9px 0!important}.report-stat{font-size:11px!important;padding:7px!important;min-width:0!important}
   .report-stat strong{font-size:16px!important}
   .report-table{width:100%!important;table-layout:fixed!important;border-collapse:collapse!important;font-size:13px!important}
   .report-table th,.report-table td{font-size:13px!important;padding:8px 7px!important;line-height:1.4!important;word-break:break-word!important;white-space:normal!important;border:1px solid #aaa!important}
-  .report-table th:nth-child(1){width:13%}.report-table th:nth-child(2){width:11%}.report-table th:nth-child(3){width:13%}.report-table th:nth-child(4){width:13%}.report-table th:nth-child(5){width:20%}.report-table th:nth-child(6){width:20%}.report-table th:nth-child(7){width:10%}
+  .report-table th:nth-child(1){width:12%}.report-table th:nth-child(2){width:10%}.report-table th:nth-child(3){width:13%}.report-table th:nth-child(4){width:14%}.report-table th:nth-child(5){width:18%}.report-table th:nth-child(6){width:20%}.report-table th:nth-child(7){width:13%}
   .coil-input{border:0!important;background:transparent!important;padding:0!important;font-size:11px!important}
  }`;
  document.head.appendChild(ps);
@@ -245,16 +237,13 @@ async function loadReport(){
    <tr><td><b>Start Time:</b> ${esc(start)}</td><td><b>End Time:</b> ${esc(end)}</td><td><b>Crew Strength:</b> ${crewTotal} (BSL: ${bsl}, Contract: ${contract})</td></tr>
    <tr><td><b>Coil Shear SL-1:</b> <input class="coil-input" id="coilSL1" placeholder="Enter Coil No" value="${esc(coils.sl1||"")}"></td><td><b>Coil Shear SL-2:</b> <input class="coil-input" id="coilSL2" placeholder="Enter Coil No" value="${esc(coils.sl2||"")}"></td><td><b>Total Logs:</b> ${total}</td></tr>
   </table>
-  <div class="report-stats">
+  <div class="report-stats" style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;">
    <div class="report-stat">Total Logs<strong>${total}</strong></div>
    <div class="report-stat">Completed<strong>${completed}</strong></div>
    <div class="report-stat">Pending<strong>${pending}</strong></div>
    <div class="report-stat">Overlook<strong>${overlook}</strong></div>
   </div>
-  <div class="table-wrap"><table class="data-table report-table" style="font-size:13px"><thead>
-   <tr><th colspan="2">Time</th><th rowspan="2">Area / Location</th><th rowspan="2">Equipment</th><th rowspan="2">Problem Description</th><th rowspan="2">Action Taken / Remarks</th><th rowspan="2">Status</th></tr>
-   <tr><th>Time</th><th>Total Time</th></tr>
-  </thead>
+  <div class="table-wrap"><table class="data-table report-table" style="font-size:13px"><thead><tr><th>Time</th><th>Total Time</th><th>Area / Location</th><th>Equipment</th><th>Problem Description</th><th>Action Taken / Remarks</th><th>Status</th></tr></thead>
   <tbody>${list.map(x=>`<tr><td>${esc(x.startTime||"")} - ${esc(x.endTime||"")}</td><td>${esc(fmtMin(totalMinutes(x.startTime,x.endTime)))}</td><td>${esc(x.area||"")}</td><td>${esc(x.equipment||"")}</td><td>${esc(x.problem||"")}</td><td>${esc([x.solution||"",x.remarks||""].filter(Boolean).join(" / "))}</td><td>${statusPill(x.status)}</td></tr>`).join("")||'<tr><td colspan="7">No maintenance logs found for this date and shift.</td></tr>'}</tbody></table></div>
  </div>`;
 }
@@ -263,10 +252,11 @@ function saveReportPdf(){
  const coils={sl1:$("coilSL1")?.value||"",sl2:$("coilSL2")?.value||""};
  try{localStorage.setItem(`sanraksh_coils_${d}_${s}`,JSON.stringify(coils))}catch(e){}
  const old=document.title;
- const fileDate=d.split("-").reverse().join("-");
- document.title=`${fileDate}_${s}_Maintenance Report`;
+ const fileTitle=`${d.split("-").reverse().join("-")}_${s}_Maintenance Report`;
+ document.title=fileTitle;
+ const restoreTitle=()=>{document.title=old;window.removeEventListener("afterprint",restoreTitle)};
+ window.addEventListener("afterprint",restoreTitle,{once:true});
  window.print();
- setTimeout(()=>document.title=old,1000);
 }
 function aboutPage(){renderShell("about","About","BSL (HRCF) - SANRAKSH");$("content").innerHTML='<div class="about-card"><img src="sanraksh-icon.png"><h2>BSL (HRCF) - SANRAKSH Maintenance Log System</h2><p>Digital maintenance log, shift crew, employee and daily report platform for HRCF.</p><p><b>Developed & Architected by</b><br>Sunil Kumar Parida<br>Junior Engineer | HRCF<br>SAIL / Bokaro Steel Plant (BSL)</p><p><b>Phone:</b> <a href="tel:7979835047">7979835047</a></p><p><b>Email:</b> <a href="mailto:sunilkumarparida.sail@gmail.com">sunilkumarparida.sail@gmail.com</a></p><p>Fill free to give your valuble feedback and suggection to imptove this website</p></div>'}
 async function syncPage(){renderShell("sync","Sync Data","Offline records");$("content").innerHTML='<div class="panel sync-card"><h2>☁ Sync Data</h2><p>Pending records: <b>0</b></p><p>Automatic synchronization will be enabled with the offline queue in the next build step.</p></div>'}
