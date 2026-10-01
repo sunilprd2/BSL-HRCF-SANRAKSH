@@ -183,9 +183,79 @@ async function employeesPage(){
  </style>
  ${groups.map(g=>`<section class="emp-section"><div class="emp-section-head ${g.cls}"><span>● &nbsp;${g.title}</span><span class="emp-section-count">${g.items.length} Persons</span></div><div class="emp-card-grid">${cards(g)}</div></section>`).join("")}`;
 }
-async function reportsPage(){renderShell("reports","Reports","Date / shift filter");$("content").innerHTML=`<h1 class="page-title">Reports</h1><div class="panel toolbar"><div class="field"><label>Select Date</label><input id="rd" type="date" value="${today()}"></div><div class="field"><label>Select Shift</label><select id="rs"><option>A Shift</option><option>B Shift</option><option>C Shift</option><option>All Shifts</option></select></div><button class="primary" onclick="loadReport()">Generate Report</button></div><div id="reportBox"></div>`;$("rs").value=currentShift();loadReport()}
-async function loadReport(){const d=$("rd").value,s=$("rs").value;
- document.getElementById("reportPrintStyle")?.remove();const ps=document.createElement("style");ps.id="reportPrintStyle";ps.textContent="@media print{ @page{size:A4 landscape;margin:8mm} body{font-size:10px!important} .sidebar,.topbar,#nav,.report-actions,.toolbar{display:none!important} .main{margin:0!important;width:100%!important} .content{padding:0!important} .report-table{width:100%!important;table-layout:fixed!important;font-size:10px!important;border-collapse:collapse!important} .report-table th,.report-table td{padding:5px 4px!important;line-height:1.25!important;word-break:break-word!important;white-space:normal!important;border:1px solid #999!important} .report-table th:nth-child(1){width:3%}.report-table th:nth-child(2){width:6%}.report-table th:nth-child(3){width:6%}.report-table th:nth-child(4){width:9%}.report-table th:nth-child(5){width:9%}.report-table th:nth-child(6){width:12%}.report-table th:nth-child(7){width:22%}.report-table th:nth-child(8){width:19%}.report-table th:nth-child(9){width:7%}.report-table th:nth-child(10){width:7%} .panel{box-shadow:none!important;border:0!important} }";document.head.appendChild(ps);$("reportBox").innerHTML='<div class="panel">Loading...</div>';let list=[];if(s==="All Shifts"){for(const sh of ["A Shift","B Shift","C Shift"]){const r=await api("report",{date:d,shift:sh},"GET").catch(()=>({logs:[]}));list.push(...(r.logs||[]))}}else{const r=await api("report",{date:d,shift:s},"GET").catch(()=>({logs:[]}));list=r.logs||[]}$("reportBox").innerHTML=`<div class="panel"><div class="report-actions"><button class="primary" onclick="window.print()">Print / PDF</button></div><div class="table-wrap"><table class="data-table report-table"><thead><tr><th>#</th><th>Date</th><th>Shift</th><th><div class="report-time"><div>Time</div><div>Total Time</div></div></th><th>Area</th><th>Equipment</th><th>Problem</th><th>Solution</th><th>Status</th><th>Remark</th></tr></thead><tbody>${list.map((x,i)=>`<tr><td>${i+1}</td><td>${esc(x.date)}</td><td>${esc(x.shift)}</td><td><div class="report-time"><div>${esc(x.startTime)} - ${esc(x.endTime)}</div><div>${fmtMin(totalMinutes(x.startTime,x.endTime))}</div></div></td><td>${esc(x.area)}</td><td>${esc(x.equipment)}</td><td>${esc(x.problem)}</td><td>${esc(x.solution)}</td><td>${statusPill(x.status)}</td><td>${esc(x.remarks)}</td></tr>`).join("")||'<tr><td colspan="10">No records.</td></tr>'}</tbody></table></div></div>`}
+async function reportsPage(){
+ renderShell("reports","Reports","Daily shift maintenance report");
+ $("content").innerHTML=`<h1 class="page-title">Reports</h1>
+ <div class="panel report-filter">
+  <div class="field"><label>Select Date</label><input id="rd" type="date" value="${today()}"></div>
+  <div class="field"><label>Select Shift</label><select id="rs"><option>A Shift</option><option>B Shift</option><option>C Shift</option></select></div>
+  <div class="report-filter-actions"><button class="primary" onclick="loadReport()">Search</button><button class="secondary" onclick="resetReport()">Reset</button></div>
+ </div>
+ <div id="reportBox"></div>`;
+ $("rs").value=currentShift();
+ loadReport();
+}
+function resetReport(){ $("rd").value=today(); $("rs").value=currentShift(); loadReport(); }
+function reportStatusCount(list,status){return list.filter(x=>String(x.status||"").toLowerCase()===String(status).toLowerCase()).length}
+async function loadReport(){
+ const d=$("rd").value,s=$("rs").value;
+ $("reportBox").innerHTML='<div class="panel">Loading report...</div>';
+ const r=await api("report",{date:d,shift:s},"GET").catch(()=>({}));
+ const list=Array.isArray(r.logs)?r.logs:[];
+ const total=list.length, completed=reportStatusCount(list,"Completed"), pending=reportStatusCount(list,"Pending"), overlook=reportStatusCount(list,"Overlook");
+ const crewTotal=Number(r.totalCrew||0), bsl=Number(r.bslEmployees||0), contract=Number(r.contractWorkers||0);
+ const start=r.startTime||({ "A Shift":"06:00","B Shift":"14:00","C Shift":"22:00" }[s]||"");
+ const end=r.endTime||({ "A Shift":"14:00","B Shift":"22:00","C Shift":"06:00" }[s]||"");
+ const si=r.shiftIncharge||"Not entered";
+ const key=`sanraksh_coils_${d}_${s}`;
+ let coils={}; try{coils=JSON.parse(localStorage.getItem(key)||"{}")}catch(e){}
+ const safeDate=d?d.split("-").reverse().join("/"):today().split("-").reverse().join("/");
+ document.getElementById("reportPrintStyle")?.remove();
+ const ps=document.createElement("style");ps.id="reportPrintStyle";
+ ps.textContent=`@media print{
+  @page{size:A4 landscape;margin:7mm}
+  body{font-size:11px!important;background:#fff!important}
+  .sidebar,.topbar,#nav,.report-filter,.report-actions,.page-title,.menu-btn{display:none!important}
+  .main{margin:0!important;width:100%!important}
+  .content{padding:0!important}
+  .report-page{border:1px solid #bbb!important;box-shadow:none!important;margin:0!important;padding:5mm!important}
+  .report-title{font-size:18px!important;margin:2px 0 10px!important}
+  .report-meta td{font-size:11px!important;padding:7px!important}
+  .report-stat{font-size:11px!important;padding:7px!important}
+  .report-stat strong{font-size:16px!important}
+  .report-table{width:100%!important;table-layout:fixed!important;border-collapse:collapse!important;font-size:11px!important}
+  .report-table th,.report-table td{padding:7px 6px!important;line-height:1.35!important;word-break:break-word!important;white-space:normal!important;border:1px solid #aaa!important}
+  .report-table th:nth-child(1){width:5%}.report-table th:nth-child(2){width:9%}.report-table th:nth-child(3){width:9%}.report-table th:nth-child(4){width:15%}.report-table th:nth-child(5){width:18%}.report-table th:nth-child(6){width:18%}.report-table th:nth-child(7){width:10%}.report-table th:nth-child(8){width:16%}
+  .coil-input{border:0!important;background:transparent!important;padding:0!important;font-size:11px!important}
+ }`;
+ document.head.appendChild(ps);
+ $("reportBox").innerHTML=`<div class="panel report-page">
+  <div class="report-actions"><button class="primary" onclick="saveReportPdf()">💾 Save PDF</button></div>
+  <h2 class="report-title">DAILY SHIFT MAINTENANCE REPORT</h2>
+  <table class="report-meta">
+   <tr><td><b>Date:</b> ${esc(safeDate)}</td><td><b>Shift:</b> ${esc(s)}</td><td><b>Shift Incharge:</b> ${esc(si)}</td></tr>
+   <tr><td><b>Start Time:</b> ${esc(start)}</td><td><b>End Time:</b> ${esc(end)}</td><td><b>Crew Strength:</b> ${crewTotal} (BSL: ${bsl}, Contract: ${contract})</td></tr>
+   <tr><td><b>Coil Shear SL-1:</b> <input class="coil-input" id="coilSL1" placeholder="Enter Coil No" value="${esc(coils.sl1||"")}"></td><td><b>Coil Shear SL-2:</b> <input class="coil-input" id="coilSL2" placeholder="Enter Coil No" value="${esc(coils.sl2||"")}"></td><td><b>Total Logs:</b> ${total}</td></tr>
+  </table>
+  <div class="report-stats">
+   <div class="report-stat">Total Logs<strong>${total}</strong></div>
+   <div class="report-stat">Completed<strong>${completed}</strong></div>
+   <div class="report-stat">Pending<strong>${pending}</strong></div>
+   <div class="report-stat">Overlook<strong>${overlook}</strong></div>
+  </div>
+  <div class="table-wrap"><table class="data-table report-table"><thead><tr><th>Time</th><th>Total Time</th><th>Area / Location</th><th>Equipment</th><th>Problem Description</th><th>Action Taken / Remarks</th><th>Status</th><th>Shift</th></tr></thead>
+  <tbody>${list.map(x=>`<tr><td>${esc(x.startTime||"")} - ${esc(x.endTime||"")}</td><td>${esc(fmtMin(totalMinutes(x.startTime,x.endTime)))}</td><td>${esc(x.area||"")}</td><td>${esc(x.equipment||"")}</td><td>${esc(x.problem||"")}</td><td>${esc([x.solution||"",x.remarks||""].filter(Boolean).join(" / "))}</td><td>${statusPill(x.status)}</td><td>${esc(x.shift||s)}</td></tr>`).join("")||'<tr><td colspan="8">No maintenance logs found for this date and shift.</td></tr>'}</tbody></table></div>
+ </div>`;
+}
+function saveReportPdf(){
+ const d=$("rd")?.value||today(), s=$("rs")?.value||currentShift();
+ const coils={sl1:$("coilSL1")?.value||"",sl2:$("coilSL2")?.value||""};
+ try{localStorage.setItem(`sanraksh_coils_${d}_${s}`,JSON.stringify(coils))}catch(e){}
+ const old=document.title;
+ document.title=`${d.split("-").reverse().join("-")}_${s}_Maintenance Report`;
+ window.print();
+ setTimeout(()=>document.title=old,1000);
+}
 function aboutPage(){renderShell("about","About","BSL (HRCF) - SANRAKSH");$("content").innerHTML='<div class="about-card"><img src="sanraksh-icon.png"><h2>BSL (HRCF) - SANRAKSH Maintenance Log System</h2><p>Digital maintenance log, shift crew, employee and daily report platform for HRCF.</p><p><b>Developed & Architected by</b><br>Sunil Kumar Parida<br>Junior Engineer | HRCF<br>SAIL / Bokaro Steel Plant (BSL)</p><p><b>Phone:</b> <a href="tel:7979835047">7979835047</a></p><p><b>Email:</b> <a href="mailto:sunilkumarparida.sail@gmail.com">sunilkumarparida.sail@gmail.com</a></p><p>Fill free to give your valuble feedback and suggection to imptove this website</p></div>'}
 async function syncPage(){renderShell("sync","Sync Data","Offline records");$("content").innerHTML='<div class="panel sync-card"><h2>☁ Sync Data</h2><p>Pending records: <b>0</b></p><p>Automatic synchronization will be enabled with the offline queue in the next build step.</p></div>'}
 
