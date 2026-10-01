@@ -6,26 +6,42 @@ const shifts=[{name:"A Shift",start:"06:00",end:"14:00",cls:"a"},{name:"B Shift"
 let session=JSON.parse(localStorage.getItem("sanrakshSession")||"null"),employees=[],areas=[],equipment=[],pending=[];
 let cachedProfile=null;
 
+/* =========================================================
+   OFFLINE FOUNDATION — STAGE 1
+========================================================= */
+const OFFLINE_DB="SANRAKSH_OFFLINE_V1",OFFLINE_VERSION=1;
+let offlineReady=null;
+function dbOpen(){if(offlineReady)return offlineReady;offlineReady=new Promise((resolve,reject)=>{const r=indexedDB.open(OFFLINE_DB,OFFLINE_VERSION);r.onupgradeneeded=()=>{const db=r.result;if(!db.objectStoreNames.contains("cache"))db.createObjectStore("cache");if(!db.objectStoreNames.contains("queue")){const q=db.createObjectStore("queue",{keyPath:"id",autoIncrement:true});q.createIndex("status","status",{unique:false})}if(!db.objectStoreNames.contains("localLogs"))db.createObjectStore("localLogs",{keyPath:"logId"})};r.onsuccess=()=>resolve(r.result);r.onerror=()=>reject(r.error)});return offlineReady}
+async function idbPut(store,key,value){const db=await dbOpen();return new Promise((res,rej)=>{const tx=db.transaction(store,"readwrite");const o=tx.objectStore(store);if(key===undefined)o.add(value);else o.put(value,key);tx.oncomplete=()=>res(value);tx.onerror=()=>rej(tx.error)})}
+async function idbGet(store,key){const db=await dbOpen();return new Promise((res,rej)=>{const r=db.transaction(store).objectStore(store).get(key);r.onsuccess=()=>res(r.result);r.onerror=()=>rej(r.error)})}
+async function idbDelete(store,key){const db=await dbOpen();return new Promise((res,rej)=>{const tx=db.transaction(store,"readwrite");tx.objectStore(store).delete(key);tx.oncomplete=()=>res();tx.onerror=()=>rej(tx.error)})}
+async function idbAll(store){const db=await dbOpen();return new Promise((res,rej)=>{const r=db.transaction(store).objectStore(store).getAll();r.onsuccess=()=>res(r.result||[]);r.onerror=()=>rej(r.error)})}
+async function cacheSet(key,value){try{await idbPut("cache",key,{value,updatedAt:Date.now()})}catch(e){}}
+async function cacheGet(key){try{const x=await idbGet("cache",key);return x?x.value:null}catch(e){return null}}
+function cacheKey(action,data){const d={...(data||{})};delete d.sessionToken;return action+"::"+JSON.stringify(d)}
+async function queueOffline(action,data,localLogId){try{return await idbPut("queue",undefined,{action,data,localLogId:localLogId||"",status:"pending",createdAt:Date.now()})}catch(e){return null}}
+async function refreshPending(){pending=(await idbAll("queue").catch(()=>[])).filter(x=>x.status==="pending");const b=$("syncBadge");if(b)b.textContent=String(pending.length)}
+async function localLogSave(log){const id=log.logId||("OFF-"+Date.now()+"-"+Math.floor(Math.random()*10000));const x={...log,logId:id,offline:true};try{await idbPut("localLogs",id,x)}catch(e){}return x}
+async function localLogs(){return await idbAll("localLogs").catch(()=>[])}
+async function syncOfflineQueue(){if(!navigator.onLine)return;const q=(await idbAll("queue").catch(()=>[])).filter(x=>x.status==="pending");for(const item of q){try{const r=await api(item.action,item.data,"POST",true);if(r&&r.success!==false){if(item.localLogId)await idbDelete("localLogs",item.localLogId);await idbDelete("queue",item.id)}else break}catch(e){break}}await refreshPending()}
+async function initOffline(){try{await dbOpen();await refreshPending()}catch(e){}window.addEventListener("online",()=>syncOfflineQueue());window.addEventListener("offline",refreshPending);setTimeout(syncOfflineQueue,500)}
+
+
 function currentShift(){const h=new Date().getHours();return h>=6&&h<14?"A Shift":h>=14&&h<22?"B Shift":"C Shift"}
 function shiftState(name){const h=new Date().getHours()+new Date().getMinutes()/60;const s=shifts.find(x=>x.name===name);let start=+s.start.slice(0,2)+ +s.start.slice(3)/60,end=+s.end.slice(0,2)+ +s.end.slice(3)/60;if(name==="C Shift"){return h>=22||h<6?"Running":h>=6?"Pending":"Completed"}return h>=end?"Completed":h>=start?"Running":"Pending"}
-function api(action,data={},method="GET"){
+function api(action,data={},method="GET",skipCache=false){
   if(!API||API.includes("PASTE_NEW"))return Promise.reject(new Error("API URL missing"));
+  const key=cacheKey(action,data);
   return new Promise((resolve,reject)=>{
-    const cb="__sanraksh_cb_"+Date.now()+"_"+Math.floor(Math.random()*100000);
-    const u=new URL(API);
-    u.searchParams.set("api","1");
-    u.searchParams.set("action",action);
-    u.searchParams.set("prefix",cb);
-    Object.entries(data||{}).forEach(([k,v])=>{
-      if(v!==undefined&&v!==null)u.searchParams.set(k,typeof v==="string"?v:JSON.stringify(v));
-    });
-    const s=document.createElement("script");
-    const timer=setTimeout(()=>{cleanup();reject(new Error("API timeout"));},20000);
-    function cleanup(){clearTimeout(timer);delete window[cb];s.remove();}
-    window[cb]=(result)=>{cleanup();resolve(result)};
-    s.onerror=()=>{cleanup();reject(new Error("API request failed"))};
-    s.src=u.toString();
-    document.body.appendChild(s);
+    const cb="__sanraksh_cb_"+Date.now()+"_"+Math.floor(Math.random()*100000),u=new URL(API);
+    u.searchParams.set("api","1");u.searchParams.set("action",action);u.searchParams.set("prefix",cb);
+    Object.entries(data||{}).forEach(([k,v])=>{if(v!==undefined&&v!==null)u.searchParams.set(k,typeof v==="string"?v:JSON.stringify(v))});
+    const sc=document.createElement("script");
+    const timer=setTimeout(async()=>{cleanup();const c=await cacheGet(key);c!==null&&!skipCache?resolve(c):reject(new Error("API timeout"))},20000);
+    function cleanup(){clearTimeout(timer);delete window[cb];sc.remove()}
+    window[cb]=async result=>{cleanup();if(result&&result.success!==false&&!skipCache)await cacheSet(key,result);resolve(result)};
+    sc.onerror=async()=>{cleanup();const c=await cacheGet(key);c!==null&&!skipCache?resolve(c):reject(new Error("API request failed"))};
+    sc.src=u.toString();document.body.appendChild(sc);
   });
 }
 function setMessage(id,msg,good=false){$(id).textContent=msg;$(id).style.color=good?"#16813b":"#c62828"}
@@ -51,7 +67,7 @@ async function resetPassword(){const s=$("forgotStaff").value.trim();try{const r
 async function openProfile(afterLogin){
  showScreen("profileScreen");$("profileStaffNo").value=session.staffNo||"";setMessage("profileMsg","Loading saved details...",true);
  try{
-  const p=await api("profile",{staffNo:session.staffNo},"GET");cachedProfile=p||{};
+  const p=(await api("profile",{staffNo:session.staffNo},"GET").catch(()=>null))||cachedProfile||session||{};cachedProfile=p;
   $("profileName").value=p.name||session.name||"";$("profileEmail").value=p.email||session.email||"";
   const ds=p.department||"",ty=p.employeeType||"",dg=p.designation||"",mob=p.mobile||"";
   const deps=p.departments||["Electrical","Mechanical","Operation","Others"];
@@ -134,14 +150,19 @@ async function addLogPage(editLog=null){
  ["logStart","logEnd"].forEach(id=>$(id).addEventListener("change",()=>{$("logTotal").value=fmtMin(totalMinutes($("logStart").value,$("logEnd").value))}));
  window.__editingLog=editLog||null;
 }
-async function saveLog(){const log=readLogForm();if(!validateLog(log))return;try{const r=await api("saveLog",{log:{...log,staffNo:session.staffNo,sessionToken:session.sessionToken}});if(r.success){alert("Maintenance log saved successfully.");logsPage()}else alert(r.message)}catch(e){alert("Connection error. If offline, this version will queue the record in the next sync build.")}}
+async function saveLog(){
+ const log=readLogForm();if(!validateLog(log))return;
+ const payload={log:{...log,staffNo:session.staffNo,sessionToken:session.sessionToken}};
+ try{const r=await api("saveLog",payload,"POST",true);if(r&&r.success){alert("Maintenance log saved successfully.");logsPage();return}alert(r?.message||"Unable to save log.")}
+ catch(e){await localLogSave(log);await queueOffline("saveLog",payload);await refreshPending();alert("Internet is OFF. Log saved on this device and will synchronize automatically when internet returns.");logsPage()}
+}
 function readLogForm(){return {logId:window.__editingLog?.logId||"",date:$("logDate").value,shift:$("logShift").value,startTime:$("logStart").value,endTime:$("logEnd").value,area:$("logArea").value,equipment:$("logEquipment").value,problem:$("logProblem").value.trim(),solution:$("logSolution").value.trim(),status:$("logStatus").value,remarks:$("logRemarks").value.trim()}}
 function validateLog(l){if(!l.date||!l.startTime||!l.area||!l.equipment||!l.problem||!l.status){alert("Please fill all required fields.");return false}return true}
 async function updateLog(){const l=readLogForm();if(!validateLog(l))return;const r=await api("updateLog",{log:l,sessionToken:session.sessionToken,staffNo:session.staffNo});alert(r.message||"Updated");if(r.success)logsPage()}
 
 async function logsPage(){
  renderShell("logs","Maintenance Logs","Filter, view and edit records");
- $("content").innerHTML='<div class="panel">Loading logs...</div>';const xs=await api("logs",{},"GET").catch(()=>[]);
+ $("content").innerHTML='<div class="panel">Loading logs...</div>';const onlineLogs=await api("logs",{},"GET").catch(()=>[]);const offlineLogs=await localLogs();const seen=new Set((Array.isArray(onlineLogs)?onlineLogs:[]).map(x=>String(x.logId||"")));const xs=[...(Array.isArray(onlineLogs)?onlineLogs:[]),...offlineLogs.filter(x=>!seen.has(String(x.logId||"")))];
  $("content").innerHTML=`<h1 class="page-title">Maintenance Logs</h1><div class="panel toolbar">
  <div class="field"><label>From Date</label><input id="lf" type="date" value="${today()}"></div><div class="field"><label>To Date</label><input id="lt" type="date" value="${today()}"></div>
  <div class="field"><label>Shift</label><select id="ls"><option>All Shifts</option><option>A Shift (06:00 - 14:00)</option><option>B Shift (14:00 - 22:00)</option><option>C Shift (22:00 - 06:00)</option></select></div>
@@ -259,7 +280,12 @@ function saveReportPdf(){
  window.print();
 }
 function aboutPage(){renderShell("about","About","BSL (HRCF) - SANRAKSH");$("content").innerHTML='<div class="about-card"><img src="sanraksh-icon.png"><h2>BSL (HRCF) - SANRAKSH Maintenance Log System</h2><p>Digital maintenance log, shift crew, employee and daily report platform for HRCF.</p><p><b>Developed & Architected by</b><br>Sunil Kumar Parida<br>Junior Engineer | HRCF<br>SAIL / Bokaro Steel Plant (BSL)</p><p><b>Phone:</b> <a href="tel:7979835047">7979835047</a></p><p><b>Email:</b> <a href="mailto:sunilkumarparida.sail@gmail.com">sunilkumarparida.sail@gmail.com</a></p><p>Fill free to give your valuble feedback and suggection to imptove this website</p></div>'}
-async function syncPage(){renderShell("sync","Sync Data","Offline records");$("content").innerHTML='<div class="panel sync-card"><h2>☁ Sync Data</h2><p>Pending records: <b>0</b></p><p>Automatic synchronization will be enabled with the offline queue in the next build step.</p></div>'}
+async function syncPage(){
+ renderShell("sync","Sync Data","Offline records");await refreshPending();const n=pending.length;
+ $("content").innerHTML=`<div class="panel sync-card"><h2>☁ Sync Data</h2><p>Connection: <b>${navigator.onLine?"Online":"Offline"}</b></p><p>Pending records: <b>${n}</b></p><p>${n?"Pending offline records will synchronize automatically when internet is available.":"No pending records."}</p><button class="primary" onclick="syncOfflineQueue().then(syncPage)">↻ Sync Now</button></div>`;
+}
+
+initOffline();
 
 document.addEventListener("DOMContentLoaded",()=>{
  $("loginForm").onsubmit=e=>{e.preventDefault();login()};$("togglePassword").onclick=toggleEye;$("newUserBtn").onclick=newUser;$("forgotBtn").onclick=forgot;$("resetBtn").onclick=resetPassword;$("forgotBack").onclick=()=>showScreen("loginScreen");$("setupBack").onclick=()=>showScreen("loginScreen");$("setupPass").oninput=passwordRules;$("createPasswordBtn").onclick=createPassword;$("profileType").onchange=loadDesignations;$("saveProfileBtn").onclick=saveProfile;$("profileHomeBtn").onclick=continueHome;$("logoutBtn").onclick=logout;$("menuBtn").onclick=()=>$("sidebar").classList.toggle("open");document.querySelectorAll("#nav button").forEach(b=>b.onclick=()=>openPage(b.dataset.page));
