@@ -223,8 +223,8 @@ async function loadReport(){
   .report-meta td{font-size:11px!important;padding:7px!important}
   .report-stat{font-size:11px!important;padding:7px!important}
   .report-stat strong{font-size:16px!important}
-  .report-table{width:100%!important;table-layout:fixed!important;border-collapse:collapse!important;font-size:11px!important}
-  .report-table th,.report-table td{padding:7px 6px!important;line-height:1.35!important;word-break:break-word!important;white-space:normal!important;border:1px solid #aaa!important}
+  .report-table{width:100%!important;table-layout:fixed!important;border-collapse:collapse!important;font-size:13px!important}
+  .report-table th,.report-table td{font-size:13px!important;padding:8px 7px!important;line-height:1.4!important;word-break:break-word!important;white-space:normal!important;border:1px solid #aaa!important}
   .report-table th:nth-child(1){width:5%}.report-table th:nth-child(2){width:9%}.report-table th:nth-child(3){width:9%}.report-table th:nth-child(4){width:15%}.report-table th:nth-child(5){width:18%}.report-table th:nth-child(6){width:18%}.report-table th:nth-child(7){width:10%}.report-table th:nth-child(8){width:16%}
   .coil-input{border:0!important;background:transparent!important;padding:0!important;font-size:11px!important}
  }`;
@@ -243,7 +243,7 @@ async function loadReport(){
    <div class="report-stat">Pending<strong>${pending}</strong></div>
    <div class="report-stat">Overlook<strong>${overlook}</strong></div>
   </div>
-  <div class="table-wrap"><table class="data-table report-table"><thead><tr><th>Time</th><th>Total Time</th><th>Area / Location</th><th>Equipment</th><th>Problem Description</th><th>Action Taken / Remarks</th><th>Status</th><th>Shift</th></tr></thead>
+  <div class="table-wrap"><table class="data-table report-table" style="font-size:13px"><thead><tr><th>Time</th><th>Total Time</th><th>Area / Location</th><th>Equipment</th><th>Problem Description</th><th>Action Taken / Remarks</th><th>Status</th><th>Shift</th></tr></thead>
   <tbody>${list.map(x=>`<tr><td>${esc(x.startTime||"")} - ${esc(x.endTime||"")}</td><td>${esc(fmtMin(totalMinutes(x.startTime,x.endTime)))}</td><td>${esc(x.area||"")}</td><td>${esc(x.equipment||"")}</td><td>${esc(x.problem||"")}</td><td>${esc([x.solution||"",x.remarks||""].filter(Boolean).join(" / "))}</td><td>${statusPill(x.status)}</td><td>${esc(x.shift||s)}</td></tr>`).join("")||'<tr><td colspan="8">No maintenance logs found for this date and shift.</td></tr>'}</tbody></table></div>
  </div>`;
 }
