@@ -25,6 +25,10 @@
       <input id="loginStaffNo" maxlength="6" inputmode="numeric" placeholder="Enter 6 digit Staff No" required>
       <label>Password</label>
       <div class="password-row"><input id="loginPassword" type="password" placeholder="Enter Password" required><button type="button" id="togglePassword">◉</button></div>
+      <label style="display:flex;align-items:center;gap:7px;margin:10px 0 4px;font-size:13px;color:#174b82;cursor:pointer;">
+  <input type="checkbox" id="rememberOffline" style="width:16px;height:16px;cursor:pointer;">
+  Remember for Offline Login
+</label>
       <button class="primary full" type="submit">Login</button>
       <div class="login-links"><button type="button" id="newUserBtn">New User</button><button type="button" id="forgotBtn">Forgot Password?</button></div>
       <div id="loginMsg" class="message"></div>
