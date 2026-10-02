@@ -1,5 +1,5 @@
-const CACHE = "sanraksh-v4";
-const ASSETS = [
+const CACHE = "sanraksh-v5";
+  const ASSETS = [
   "./",
   "./index.html",
   "./styles.css",
