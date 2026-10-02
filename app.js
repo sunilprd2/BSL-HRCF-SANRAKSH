@@ -3,7 +3,7 @@ const $=id=>document.getElementById(id);
 const esc=v=>String(v??"").replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"}[m]));
 const today=()=>new Date().toISOString().slice(0,10);
 const shifts=[{name:"A Shift",start:"06:00",end:"14:00",cls:"a"},{name:"B Shift",start:"14:00",end:"22:00",cls:"b"},{name:"C Shift",start:"22:00",end:"06:00",cls:"c"}];
-let session=JSON.parse(localStorage.getItem("sanrakshSession")||"null"),employees=[],areas=[],equipment=[],pending=[];
+let session=null,employees=[],areas=[],equipment=[],pending=[];
 let cachedProfile=null;
 
 /* =========================================================
@@ -470,6 +470,6 @@ document.addEventListener("DOMContentLoaded",()=>{
    });
  }$("newUserBtn").onclick=newUser;$("forgotBtn").onclick=forgot;$("resetBtn").onclick=resetPassword;$("forgotBack").onclick=()=>showScreen("loginScreen");$("setupBack").onclick=()=>showScreen("loginScreen");$("setupPass").oninput=passwordRules;$("createPasswordBtn").onclick=createPassword;$("profileType").onchange=loadDesignations;$("saveProfileBtn").onclick=saveProfile;$("profileHomeBtn").onclick=continueHome;$("logoutBtn").onclick=logout;$("menuBtn").onclick=()=>$("sidebar").classList.toggle("open");document.querySelectorAll("#nav button").forEach(b=>b.onclick=()=>openPage(b.dataset.page));
  openOfflineDb().then(()=>{updateSyncBadge();if(navigator.onLine)setTimeout(syncPending,700)}).catch(()=>{});
- if(session){openProfile(true)}else showScreen("loginScreen");
+ showScreen("loginScreen");
 });
 if("serviceWorker"in navigator)navigator.serviceWorker.register("./sw.js").catch(()=>{});
