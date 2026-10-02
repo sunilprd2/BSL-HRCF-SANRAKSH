@@ -241,7 +241,7 @@ function home(){
  Promise.all([api("dashboard",{}, "GET").catch(()=>({})),api("allShiftCrew",{date:today()},"GET").catch(()=>[]),api("employees",{},"GET").catch(()=>[])])
  .then(([dash,crew,emps])=>{
   employees=Array.isArray(emps)?emps:[];
-  if(Array.isArray(emps))await cachePut("employees",employees);
+  if(Array.isArray(emps))cachePut("employees",employees);
   const now=currentShift();const c=(Array.isArray(crew)?crew:[]).find(x=>x.shiftName===now)||{};
   $("content").innerHTML=`<h1 class="page-title">Home</h1>
   <div class="home-hero"><h2>Welcome, ${esc(session?.name||session?.staffNo||"Employee")}</h2><p>${esc(session?.employeeType||"Employee")}</p><p><b>${now}</b> • ${shifts.find(x=>x.name===now)?.start} - ${shifts.find(x=>x.name===now)?.end} • ${today()}</p></div>
