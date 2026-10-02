@@ -197,6 +197,7 @@ async function login(){
    }
 
    await openProfile(true);
+   setTimeout(preloadOfflineData,300);
 
  }catch(e){
    setMessage("loginMsg","Connection error. Please check API URL.");
@@ -239,7 +240,9 @@ function home(){
  $("content").innerHTML='<div class="loading panel">Loading dashboard...</div>';
  Promise.all([api("dashboard",{}, "GET").catch(()=>({})),api("allShiftCrew",{date:today()},"GET").catch(()=>[]),api("employees",{},"GET").catch(()=>[])])
  .then(([dash,crew,emps])=>{
-  employees=Array.isArray(emps)?emps:[];const now=currentShift();const c=(Array.isArray(crew)?crew:[]).find(x=>x.shiftName===now)||{};
+  employees=Array.isArray(emps)?emps:[];
+  if(Array.isArray(emps))await cachePut("employees",employees);
+  const now=currentShift();const c=(Array.isArray(crew)?crew:[]).find(x=>x.shiftName===now)||{};
   $("content").innerHTML=`<h1 class="page-title">Home</h1>
   <div class="home-hero"><h2>Welcome, ${esc(session?.name||session?.staffNo||"Employee")}</h2><p>${esc(session?.employeeType||"Employee")}</p><p><b>${now}</b> • ${shifts.find(x=>x.name===now)?.start} - ${shifts.find(x=>x.name===now)?.end} • ${today()}</p></div>
   <div class="shift-grid">${shifts.map(s=>{const x=(Array.isArray(crew)?crew:[]).find(y=>y.shiftName===s.name)||{};const emp=employees.find(e=>String(e.name).toLowerCase()===String(x.shiftIncharge||"").toLowerCase());const st=shiftState(s.name);return `<div class="shift-card ${s.cls} ${st==="Running"?"active":""}" onclick="shiftDetailsPage('${s.name}')"><h3>${s.name.toUpperCase()}</h3><div class="time">${s.start} - ${s.end}</div><div class="incharge">${esc(x.shiftIncharge||"Not entered")}</div><div class="phone">☎ ${esc(emp?.mobile||"")}</div><span class="shift-status ${st.toLowerCase()}">${st}</span></div>`}).join("")}</div>
@@ -334,10 +337,27 @@ async function logsPage(){
 function normShift(v){return String(v).replace(/\s*\(.*/,"")}
 function filterLogs(){const f=$("lf").value,t=$("lt").value,s=normShift($("ls").value);const xs=(window.__allLogs||[]).filter(x=>(!f||x.date>=f)&&(!t||x.date<=t)&&(!s||s==="All Shifts"||x.shift===s));$("logsTable").innerHTML=`<table class="data-table"><thead><tr><th>#</th><th>Shift</th><th>Time</th><th>Total Time</th><th>Area</th><th>Equipment</th><th>Problem</th><th>Status</th><th>Edit</th></tr></thead><tbody>${xs.map((x,i)=>`<tr><td>${i+1}</td><td>${esc(x.shift)}</td><td>${esc(x.startTime)} - ${esc(x.endTime)}</td><td>${fmtMin(totalMinutes(x.startTime,x.endTime))}</td><td>${esc(x.area)}</td><td>${esc(x.equipment)}</td><td>${esc(x.problem)}</td><td>${statusPill(x.status)}</td><td><button class="edit-btn" onclick='addLogPage(${JSON.stringify(x).replace(/'/g,"&#39;")})'>✎</button></td></tr>`).join("")||'<tr><td colspan="9">No logs found.</td></tr>'}</tbody></table>`}
 
+async function getEmployeesOfflineFirst(){
+ try{
+  const xs=await api("employees",{},"GET");
+  employees=Array.isArray(xs)?xs:[];
+  await cachePut("employees",employees);
+  return employees;
+ }catch(e){
+  const xs=await cacheGet("employees",[]);
+  employees=Array.isArray(xs)?xs:[];
+  return employees;
+ }
+}
+
+async function preloadOfflineData(){
+ if(!navigator.onLine)return;
+ try{await getEmployeesOfflineFirst()}catch(e){}
+}
+
 async function employeesPage(){
  renderShell("employees","Employee Details","Employees master");
- const xs=await api("employees",{},"GET").catch(()=>[]);
- employees=Array.isArray(xs)?xs:[];
+ const xs=await getEmployeesOfflineFirst();
  const typeKey=x=>String(x.employeeType||"").trim().toLowerCase();
  const groups=[
   {key:"executive",title:"BSL EXECUTIVES (SHIFT INCHARGES)",cls:"exec",items:employees.filter(x=>typeKey(x)==="executive")},
@@ -471,5 +491,6 @@ document.addEventListener("DOMContentLoaded",()=>{
  }$("newUserBtn").onclick=newUser;$("forgotBtn").onclick=forgot;$("resetBtn").onclick=resetPassword;$("forgotBack").onclick=()=>showScreen("loginScreen");$("setupBack").onclick=()=>showScreen("loginScreen");$("setupPass").oninput=passwordRules;$("createPasswordBtn").onclick=createPassword;$("profileType").onchange=loadDesignations;$("saveProfileBtn").onclick=saveProfile;$("profileHomeBtn").onclick=continueHome;$("logoutBtn").onclick=logout;$("menuBtn").onclick=()=>$("sidebar").classList.toggle("open");document.querySelectorAll("#nav button").forEach(b=>b.onclick=()=>openPage(b.dataset.page));
  openOfflineDb().then(()=>{updateSyncBadge();if(navigator.onLine)setTimeout(syncPending,700)}).catch(()=>{});
  showScreen("loginScreen");
+ if(session&&navigator.onLine)setTimeout(preloadOfflineData,500);
 });
 if("serviceWorker"in navigator)navigator.serviceWorker.register("./sw.js").catch(()=>{});

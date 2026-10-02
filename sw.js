@@ -1,5 +1,5 @@
-const CACHE = "sanraksh-v5";
-  const ASSETS = [
+const CACHE = "sanraksh-v6";
+const ASSETS = [
   "./",
   "./index.html",
   "./styles.css",
@@ -35,7 +35,6 @@ self.addEventListener("fetch", event => {
   const request = event.request;
   if (request.method !== "GET") return;
 
-  // Navigation: use the cached app shell when the network is unavailable.
   if (request.mode === "navigate") {
     event.respondWith(
       fetch(request)
@@ -49,7 +48,6 @@ self.addEventListener("fetch", event => {
     return;
   }
 
-  // Same-origin static files: cache first, then network and cache the result.
   const url = new URL(request.url);
   if (url.origin === self.location.origin) {
     event.respondWith(
