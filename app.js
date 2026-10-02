@@ -351,15 +351,19 @@ function filterLogs(){const f=$("lf").value,t=$("lt").value,s=normShift($("ls").
 
 async function getEmployeesOfflineFirst(){
  try{
-  const xs=await api("employees",{},"GET");
-  employees=Array.isArray(xs)?xs:[];
-  await cachePut("employees",employees);
-  return employees;
- }catch(e){
-  const xs=await cacheGet("employees",[]);
-  employees=Array.isArray(xs)?xs:[];
-  return employees;
- }
+  if(navigator.onLine){
+   const xs=await api("employees",{},"GET");
+   const list=Array.isArray(xs)?xs:[];
+   if(list.length){
+    employees=list;
+    await cachePut("employees",employees);
+    return employees;
+   }
+  }
+ }catch(e){}
+ const cached=await cacheGet("employees",[]);
+ employees=Array.isArray(cached)?cached:[];
+ return employees;
 }
 
 async function preloadOfflineData(){
@@ -369,12 +373,13 @@ async function preloadOfflineData(){
 
 async function employeesPage(){
  renderShell("employees","Employee Details","Employees master");
+ $("content").innerHTML='<div class="panel">Loading employee details...</div>';
  const xs=await getEmployeesOfflineFirst();
- const typeKey=x=>String(x.employeeType||"").trim().toLowerCase();
+ const typeKey=x=>String(x?.employeeType||"").trim().toLowerCase().replace(/[ _-]+/g,"");
  const groups=[
   {key:"executive",title:"BSL EXECUTIVES (SHIFT INCHARGES)",cls:"exec",items:employees.filter(x=>typeKey(x)==="executive")},
-  {key:"non-executive",title:"BSL EMPLOYEES (TECHNICIANS & OPERATORS)",cls:"nonexec",items:employees.filter(x=>typeKey(x)==="non-executive")},
-  {key:"contract",title:"CONTRACT LABOUR",cls:"contract",items:employees.filter(x=>typeKey(x)==="contract worker"||typeKey(x)==="contract")}
+  {key:"non-executive",title:"BSL EMPLOYEES (TECHNICIANS & OPERATORS)",cls:"nonexec",items:employees.filter(x=>typeKey(x)==="nonexecutive")},
+  {key:"contract",title:"CONTRACT LABOUR",cls:"contract",items:employees.filter(x=>typeKey(x)==="contractworker"||typeKey(x)==="contract")}
  ];
  const cards=g=>g.items.map(x=>{
    const initials=String(x.name||"?").trim().split(/\s+/).slice(0,2).map(v=>v[0]||"").join("").toUpperCase();
