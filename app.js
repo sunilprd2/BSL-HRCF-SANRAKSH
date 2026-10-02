@@ -260,14 +260,17 @@ async function shiftDetailsPage(forceShift=""){
 }
 async function editShift(name){
  const data=await api("shiftCrew",{date:today(),shift:name},"GET").catch(()=>({}));
- const emps=await api("employees",{},"GET").catch(()=>[]);
- employees=Array.isArray(emps)?emps:[];
- const opts=employees.map(e=>`<option value="${esc(e.name)}" data-mobile="${esc(e.mobile||"")}">${esc(e.name)}${e.staffNo?" — "+esc(e.staffNo):""}</option>`).join("");
+ const emps=await getEmployeesOfflineFirst();
+ const typeKey=e=>String(e?.employeeType||"").trim().toLowerCase();
+ const executiveEmployees=emps.filter(e=>typeKey(e)==="executive");
+ const nonExecutiveEmployees=emps.filter(e=>typeKey(e)==="non-executive");
+ const execOpts=executiveEmployees.map(e=>`<option value="${esc(e.name)}" data-mobile="${esc(e.mobile||"")}">${esc(e.name)}</option>`).join("");
+ const nonExecOpts=nonExecutiveEmployees.map(e=>`<option value="${esc(e.name)}">${esc(e.name)}</option>`).join("");
  $("content").innerHTML=`<h1 class="page-title">Edit ${name}</h1><div class="panel"><div class="form-grid">
  <div><label>Shift</label><input readonly value="${name}"></div>
- <div><label>Shift In-Charge *</label><select id="esIn" onchange="syncShiftMobile()"><option value="">Select Shift In-Charge</option>${opts}</select></div>
+ <div><label>Shift In-Charge *</label><select id="esIn" onchange="syncShiftMobile()"><option value="">Select Shift In-Charge</option>${execOpts}</select></div>
  <div><label>Mobile No</label><input id="esPhone" readonly placeholder="From Employees master"></div>
- <div><label>Line In-Charge</label><select id="esLine"><option value="">Select Line In-Charge</option>${opts}</select></div>
+ <div><label>Line In-Charge</label><select id="esLine"><option value="">Select Line In-Charge</option>${nonExecOpts}</select></div>
  <div><label>BSL Employees *</label><input id="esBsl" type="number" value="${data.bslEmployees||0}"></div>
  <div><label>Contract Workers *</label><input id="esCon" type="number" value="${data.contractWorkers||0}"></div>
  </div><div class="form-actions"><button class="secondary" onclick="shiftDetailsPage()">Cancel</button><button class="primary" onclick="saveShift('${name}')">Update</button></div></div>`;
@@ -276,7 +279,16 @@ async function editShift(name){
  syncShiftMobile();
 }
 function syncShiftMobile(){const s=$("esIn"),p=$("esPhone");if(!s||!p)return;const o=s.options[s.selectedIndex];p.value=o?.dataset.mobile||""}
-async function saveShift(name){const d={date:today(),shift:name,shiftIncharge:$("esIn").value,lineIncharge:$("esLine").value,bslEmployees:Number($("esBsl").value||0),contractWorkers:Number($("esCon").value||0),totalCrew:Number($("esBsl").value||0)+Number($("esCon").value||0),sessionToken:session?.sessionToken||"",staffNo:session?.staffNo||""};const r=await api("saveShiftCrew",{details:d});alert(r.message||"Updated");if(r.success)shiftDetailsPage()}
+async function saveShift(name){
+ const shiftIncharge=$("esIn").value.trim();
+ const lineIncharge=$("esLine").value.trim();
+ if(!shiftIncharge){alert("Please select Shift In-Charge from Executive employees.");return}
+ if(!lineIncharge){alert("Please select Line In-Charge from Non-Executive employees.");return}
+ const d={date:today(),shiftName:name,shiftIncharge,lineIncharge,bslEmployees:Number($("esBsl").value||0),contractWorkers:Number($("esCon").value||0),totalCrew:Number($("esBsl").value||0)+Number($("esCon").value||0),sessionToken:session?.sessionToken||"",staffNo:session?.staffNo||""};
+ const r=await api("saveShiftCrew",{details:d});
+ alert(r.message||"Updated");
+ if(r.success)shiftDetailsPage();
+}
 
 async function loadMasters(){
  if(!areas.length){areas=await api("areas",{},"GET").then(r=>{cachePut("areas",r);return r}).catch(()=>cacheGet("areas",[]))}
@@ -352,7 +364,7 @@ async function getEmployeesOfflineFirst(){
 
 async function preloadOfflineData(){
  if(!navigator.onLine)return;
- try{await getEmployeesOfflineFirst()}catch(e){}
+ try{await getEmployeesOfflineFirst();await loadMasters()}catch(e){}
 }
 
 async function employeesPage(){
