@@ -7,41 +7,62 @@ let session=JSON.parse(localStorage.getItem("sanrakshSession")||"null"),employee
 let cachedProfile=null;
 
 /* =========================================================
-   OFFLINE FOUNDATION — STAGE 1
+   OFFLINE-FIRST STORAGE / AUTOMATIC SYNC
 ========================================================= */
-const OFFLINE_DB="SANRAKSH_OFFLINE_V1",OFFLINE_VERSION=1;
-let offlineReady=null;
-function dbOpen(){if(offlineReady)return offlineReady;offlineReady=new Promise((resolve,reject)=>{const r=indexedDB.open(OFFLINE_DB,OFFLINE_VERSION);r.onupgradeneeded=()=>{const db=r.result;if(!db.objectStoreNames.contains("cache"))db.createObjectStore("cache");if(!db.objectStoreNames.contains("queue")){const q=db.createObjectStore("queue",{keyPath:"id",autoIncrement:true});q.createIndex("status","status",{unique:false})}if(!db.objectStoreNames.contains("localLogs"))db.createObjectStore("localLogs",{keyPath:"logId"})};r.onsuccess=()=>resolve(r.result);r.onerror=()=>reject(r.error)});return offlineReady}
-async function idbPut(store,key,value){const db=await dbOpen();return new Promise((res,rej)=>{const tx=db.transaction(store,"readwrite");const o=tx.objectStore(store);if(key===undefined)o.add(value);else o.put(value,key);tx.oncomplete=()=>res(value);tx.onerror=()=>rej(tx.error)})}
-async function idbGet(store,key){const db=await dbOpen();return new Promise((res,rej)=>{const r=db.transaction(store).objectStore(store).get(key);r.onsuccess=()=>res(r.result);r.onerror=()=>rej(r.error)})}
-async function idbDelete(store,key){const db=await dbOpen();return new Promise((res,rej)=>{const tx=db.transaction(store,"readwrite");tx.objectStore(store).delete(key);tx.oncomplete=()=>res();tx.onerror=()=>rej(tx.error)})}
-async function idbAll(store){const db=await dbOpen();return new Promise((res,rej)=>{const r=db.transaction(store).objectStore(store).getAll();r.onsuccess=()=>res(r.result||[]);r.onerror=()=>rej(r.error)})}
-async function cacheSet(key,value){try{await idbPut("cache",key,{value,updatedAt:Date.now()})}catch(e){}}
-async function cacheGet(key){try{const x=await idbGet("cache",key);return x?x.value:null}catch(e){return null}}
-function cacheKey(action,data){const d={...(data||{})};delete d.sessionToken;return action+"::"+JSON.stringify(d)}
-async function queueOffline(action,data,localLogId){try{return await idbPut("queue",undefined,{action,data,localLogId:localLogId||"",status:"pending",createdAt:Date.now()})}catch(e){return null}}
-async function refreshPending(){pending=(await idbAll("queue").catch(()=>[])).filter(x=>x.status==="pending");const b=$("syncBadge");if(b)b.textContent=String(pending.length)}
-async function localLogSave(log){const id=log.logId||("OFF-"+Date.now()+"-"+Math.floor(Math.random()*10000));const x={...log,logId:id,offline:true};try{await idbPut("localLogs",id,x)}catch(e){}return x}
-async function localLogs(){return await idbAll("localLogs").catch(()=>[])}
-async function syncOfflineQueue(){if(!navigator.onLine)return;const q=(await idbAll("queue").catch(()=>[])).filter(x=>x.status==="pending");for(const item of q){try{const r=await api(item.action,item.data,"POST",true);if(r&&r.success!==false){if(item.localLogId)await idbDelete("localLogs",item.localLogId);await idbDelete("queue",item.id)}else break}catch(e){break}}await refreshPending()}
-async function initOffline(){try{await dbOpen();await refreshPending()}catch(e){}window.addEventListener("online",()=>syncOfflineQueue());window.addEventListener("offline",refreshPending);setTimeout(syncOfflineQueue,500)}
-
+const OFFLINE_DB="sanraksh-offline-v1";
+let offlineDbPromise=null;
+function openOfflineDb(){
+  if(offlineDbPromise)return offlineDbPromise;
+  offlineDbPromise=new Promise((resolve,reject)=>{
+    const r=indexedDB.open(OFFLINE_DB,1);
+    r.onupgradeneeded=()=>{const db=r.result;if(!db.objectStoreNames.contains("queue"))db.createObjectStore("queue",{keyPath:"id"});if(!db.objectStoreNames.contains("cache"))db.createObjectStore("cache",{keyPath:"key"});};
+    r.onsuccess=()=>resolve(r.result);r.onerror=()=>reject(r.error);
+  });
+  return offlineDbPromise;
+}
+async function idbPut(store,value){const db=await openOfflineDb();return new Promise((res,rej)=>{const tx=db.transaction(store,"readwrite");tx.objectStore(store).put(value);tx.oncomplete=()=>res(value);tx.onerror=()=>rej(tx.error);});}
+async function idbGet(store,key){const db=await openOfflineDb();return new Promise((res,rej)=>{const tx=db.transaction(store,"readonly");const r=tx.objectStore(store).get(key);r.onsuccess=()=>res(r.result?.value);r.onerror=()=>rej(r.error);});}
+async function idbAll(store){const db=await openOfflineDb();return new Promise((res,rej)=>{const tx=db.transaction(store,"readonly");const r=tx.objectStore(store).getAll();r.onsuccess=()=>res(r.result||[]);r.onerror=()=>rej(r.error);});}
+async function idbDelete(store,key){const db=await openOfflineDb();return new Promise((res,rej)=>{const tx=db.transaction(store,"readwrite");tx.objectStore(store).delete(key);tx.oncomplete=()=>res(true);tx.onerror=()=>rej(tx.error);});}
+async function cachePut(key,value){try{await idbPut("cache",{key,value});}catch(e){}}
+async function cacheGet(key,fallback){try{const v=await idbGet("cache",key);return v===undefined?fallback:v;}catch(e){return fallback;}}
+function makeClientLogId(){return (crypto?.randomUUID?crypto.randomUUID():("CL-"+Date.now()+"-"+Math.random().toString(36).slice(2,10)));}
+async function queuedCount(){try{return (await idbAll("queue")).length}catch(e){return 0}}
+async function updateSyncBadge(){const n=await queuedCount();const b=$("syncBadge");if(b){b.textContent=String(n);b.classList.toggle("hidden",n===0)}return n;}
+async function queueMaintenanceLog(log){const clientLogId=log.clientLogId||makeClientLogId();const record={id:clientLogId,clientLogId,log:{...log,clientLogId},createdAt:Date.now(),attempts:0};await idbPut("queue",record);await updateSyncBadge();return record;}
+async function getQueuedLogs(){return (await idbAll("queue")).sort((a,b)=>a.createdAt-b.createdAt)}
+async function syncPending(){
+  if(!navigator.onLine)return {synced:0,remaining:await queuedCount()};
+  const list=await getQueuedLogs();let synced=0;
+  for(const item of list){
+    try{const r=await api("saveLog",{log:item.log});if(r&&r.success){await idbDelete("queue",item.id);synced++;}else break;}catch(e){break}
+  }
+  const remaining=await queuedCount();await updateSyncBadge();return {synced,remaining};
+}
+window.addEventListener("online",()=>{setTimeout(syncPending,500)});
+window.addEventListener("offline",updateSyncBadge);
 
 function currentShift(){const h=new Date().getHours();return h>=6&&h<14?"A Shift":h>=14&&h<22?"B Shift":"C Shift"}
 function shiftState(name){const h=new Date().getHours()+new Date().getMinutes()/60;const s=shifts.find(x=>x.name===name);let start=+s.start.slice(0,2)+ +s.start.slice(3)/60,end=+s.end.slice(0,2)+ +s.end.slice(3)/60;if(name==="C Shift"){return h>=22||h<6?"Running":h>=6?"Pending":"Completed"}return h>=end?"Completed":h>=start?"Running":"Pending"}
-function api(action,data={},method="GET",skipCache=false){
+function api(action,data={},method="GET"){
+  if(!navigator.onLine)return Promise.reject(new Error("OFFLINE"));
   if(!API||API.includes("PASTE_NEW"))return Promise.reject(new Error("API URL missing"));
-  const key=cacheKey(action,data);
   return new Promise((resolve,reject)=>{
-    const cb="__sanraksh_cb_"+Date.now()+"_"+Math.floor(Math.random()*100000),u=new URL(API);
-    u.searchParams.set("api","1");u.searchParams.set("action",action);u.searchParams.set("prefix",cb);
-    Object.entries(data||{}).forEach(([k,v])=>{if(v!==undefined&&v!==null)u.searchParams.set(k,typeof v==="string"?v:JSON.stringify(v))});
-    const sc=document.createElement("script");
-    const timer=setTimeout(async()=>{cleanup();const c=await cacheGet(key);c!==null&&!skipCache?resolve(c):reject(new Error("API timeout"))},20000);
-    function cleanup(){clearTimeout(timer);delete window[cb];sc.remove()}
-    window[cb]=async result=>{cleanup();if(result&&result.success!==false&&!skipCache)await cacheSet(key,result);resolve(result)};
-    sc.onerror=async()=>{cleanup();const c=await cacheGet(key);c!==null&&!skipCache?resolve(c):reject(new Error("API request failed"))};
-    sc.src=u.toString();document.body.appendChild(sc);
+    const cb="__sanraksh_cb_"+Date.now()+"_"+Math.floor(Math.random()*100000);
+    const u=new URL(API);
+    u.searchParams.set("api","1");
+    u.searchParams.set("action",action);
+    u.searchParams.set("prefix",cb);
+    Object.entries(data||{}).forEach(([k,v])=>{
+      if(v!==undefined&&v!==null)u.searchParams.set(k,typeof v==="string"?v:JSON.stringify(v));
+    });
+    const s=document.createElement("script");
+    const timer=setTimeout(()=>{cleanup();reject(new Error("API timeout"));},20000);
+    function cleanup(){clearTimeout(timer);delete window[cb];s.remove();}
+    window[cb]=(result)=>{cleanup();resolve(result)};
+    s.onerror=()=>{cleanup();reject(new Error("API request failed"))};
+    s.src=u.toString();
+    document.body.appendChild(s);
   });
 }
 function setMessage(id,msg,good=false){$(id).textContent=msg;$(id).style.color=good?"#16813b":"#c62828"}
@@ -67,7 +88,7 @@ async function resetPassword(){const s=$("forgotStaff").value.trim();try{const r
 async function openProfile(afterLogin){
  showScreen("profileScreen");$("profileStaffNo").value=session.staffNo||"";setMessage("profileMsg","Loading saved details...",true);
  try{
-  const p=(await api("profile",{staffNo:session.staffNo},"GET").catch(()=>null))||cachedProfile||session||{};cachedProfile=p;
+  const p=await api("profile",{staffNo:session.staffNo},"GET");cachedProfile=p||{};
   $("profileName").value=p.name||session.name||"";$("profileEmail").value=p.email||session.email||"";
   const ds=p.department||"",ty=p.employeeType||"",dg=p.designation||"",mob=p.mobile||"";
   const deps=p.departments||["Electrical","Mechanical","Operation","Others"];
@@ -76,8 +97,12 @@ async function openProfile(afterLogin){
   const has=!!(p.department&&p.mobile&&p.employeeType&&p.designation);
   setMessage("profileMsg",has?"Saved employee details loaded. You may edit permitted fields or continue to Home.":"Please complete your employee details before entering the system.",true);
   $("profileHomeBtn").disabled=!has;
- }catch(e){setMessage("profileMsg","Unable to load Employee Details.")}
-}
+ }catch(e){
+  if(session?.department&&session?.mobile&&session?.employeeType&&session?.designation){
+    const p={name:session.name||"",email:session.email||"",department:session.department,mobile:session.mobile,employeeType:session.employeeType,designation:session.designation,departments:["Electrical","Mechanical","Operation","Others"]};
+    cachedProfile=p;$("profileName").value=p.name;$("profileEmail").value=p.email;$("profileDepartment").innerHTML='<option value="">Select Department</option>'+p.departments.map(x=>`<option>${esc(x)}</option>`).join("");$("profileDepartment").value=p.department;$("profileType").value=p.employeeType;loadDesignations();$("profileDesignation").value=p.designation;$("profileMobile").value=p.mobile;$("profileHomeBtn").disabled=false;setMessage("profileMsg","Offline mode: using saved Employee Details.",true);
+  }else setMessage("profileMsg","Employee Details are not cached. Connect to internet once to initialize offline mode.");
+ }}
 function loadDesignations(){const t=$("profileType").value;const d={Executive:["Assistant Manager","Manager","Senior Manager","Assistant General Manager (AGM)","Deputy General Manager (DGM)"],"Non-Executive":["Jr. Engineer","Engineering Associate","Jr. Engineering Associate","Technical Associate"],"Contract Worker":["Contract Worker"]}[t]||[];$("profileDesignation").innerHTML='<option value="">Select Designation</option>'+d.map(x=>`<option>${esc(x)}</option>`).join("")}
 async function saveProfile(){const details={staffNo:session.staffNo,sessionToken:session.sessionToken,name:$("profileName").value,department:$("profileDepartment").value,mobile:$("profileMobile").value.trim(),employeeType:$("profileType").value,designation:$("profileDesignation").value,email:$("profileEmail").value};if(!details.department||!/^\d{10}$/.test(details.mobile)||!details.employeeType||!details.designation){setMessage("profileMsg","Please complete all employee details correctly.");return}try{const r=await api("saveProfile",{details});if(!r.success){setMessage("profileMsg",r.message);return}cachedProfile=r;session={...session,name:r.name,department:r.department,mobile:r.mobile,employeeType:r.employeeType,designation:r.designation};localStorage.setItem("sanrakshSession",JSON.stringify(session));setMessage("profileMsg","Employee details saved successfully.",true);$("profileHomeBtn").disabled=false;setTimeout(home,500)}catch(e){setMessage("profileMsg","Connection error.")}}
 function continueHome(){home()}
@@ -126,7 +151,10 @@ async function editShift(name){
 function syncShiftMobile(){const s=$("esIn"),p=$("esPhone");if(!s||!p)return;const o=s.options[s.selectedIndex];p.value=o?.dataset.mobile||""}
 async function saveShift(name){const d={date:today(),shift:name,shiftIncharge:$("esIn").value,lineIncharge:$("esLine").value,bslEmployees:Number($("esBsl").value||0),contractWorkers:Number($("esCon").value||0),totalCrew:Number($("esBsl").value||0)+Number($("esCon").value||0),sessionToken:session?.sessionToken||"",staffNo:session?.staffNo||""};const r=await api("saveShiftCrew",{details:d});alert(r.message||"Updated");if(r.success)shiftDetailsPage()}
 
-async function loadMasters(){if(!areas.length)areas=await api("areas",{},"GET").catch(()=>[]);if(!equipment.length)equipment=await api("equipment",{},"GET").catch(()=>[])}
+async function loadMasters(){
+ if(!areas.length){areas=await api("areas",{},"GET").then(r=>{cachePut("areas",r);return r}).catch(()=>cacheGet("areas",[]))}
+ if(!equipment.length){equipment=await api("equipment",{},"GET").then(r=>{cachePut("equipment",r);return r}).catch(()=>cacheGet("equipment",[]))}
+}
 function totalMinutes(a,b){if(!a||!b)return 0;let [h1,m1]=a.split(":").map(Number),[h2,m2]=b.split(":").map(Number),x=h1*60+m1,y=h2*60+m2;if(y<x)y+=1440;return y-x}
 function fmtMin(m){m=Number(m||0);return `${String(Math.floor(m/60)).padStart(2,"0")}:${String(m%60).padStart(2,"0")}`}
 async function addLogPage(editLog=null){
@@ -152,9 +180,15 @@ async function addLogPage(editLog=null){
 }
 async function saveLog(){
  const log=readLogForm();if(!validateLog(log))return;
- const payload={log:{...log,staffNo:session.staffNo,sessionToken:session.sessionToken}};
- try{const r=await api("saveLog",payload,"POST",true);if(r&&r.success){alert("Maintenance log saved successfully.");logsPage();return}alert(r?.message||"Unable to save log.")}
- catch(e){await localLogSave(log);await queueOffline("saveLog",payload);await refreshPending();alert("Internet is OFF. Log saved on this device and will synchronize automatically when internet returns.");logsPage()}
+ const payload={...log,staffNo:session?.staffNo||"",sessionToken:session?.sessionToken||"",clientLogId:makeClientLogId()};
+ try{
+  const r=await api("saveLog",{log:payload});
+  if(r.success){alert("Maintenance log saved successfully.");logsPage()}else alert(r.message||"Unable to save log.");
+ }catch(e){
+  await queueMaintenanceLog(payload);
+  alert("Saved on this device. It will automatically sync to the Master Google Sheet when internet returns.");
+  logsPage();
+ }
 }
 function readLogForm(){return {logId:window.__editingLog?.logId||"",date:$("logDate").value,shift:$("logShift").value,startTime:$("logStart").value,endTime:$("logEnd").value,area:$("logArea").value,equipment:$("logEquipment").value,problem:$("logProblem").value.trim(),solution:$("logSolution").value.trim(),status:$("logStatus").value,remarks:$("logRemarks").value.trim()}}
 function validateLog(l){if(!l.date||!l.startTime||!l.area||!l.equipment||!l.problem||!l.status){alert("Please fill all required fields.");return false}return true}
@@ -162,7 +196,11 @@ async function updateLog(){const l=readLogForm();if(!validateLog(l))return;const
 
 async function logsPage(){
  renderShell("logs","Maintenance Logs","Filter, view and edit records");
- $("content").innerHTML='<div class="panel">Loading logs...</div>';const onlineLogs=await api("logs",{},"GET").catch(()=>[]);const offlineLogs=await localLogs();const seen=new Set((Array.isArray(onlineLogs)?onlineLogs:[]).map(x=>String(x.logId||"")));const xs=[...(Array.isArray(onlineLogs)?onlineLogs:[]),...offlineLogs.filter(x=>!seen.has(String(x.logId||"")))];
+ $("content").innerHTML='<div class="panel">Loading logs...</div>';
+ let xs=await api("logs",{},"GET").then(r=>{cachePut("logs",r);return r}).catch(()=>cacheGet("logs",[]));
+ const q=await getQueuedLogs();
+ const queuedView=q.map(x=>({...x.log,logId:"OFFLINE-"+x.clientLogId.slice(0,8),_offline:true}));
+ xs=[...queuedView,...(Array.isArray(xs)?xs:[])];
  $("content").innerHTML=`<h1 class="page-title">Maintenance Logs</h1><div class="panel toolbar">
  <div class="field"><label>From Date</label><input id="lf" type="date" value="${today()}"></div><div class="field"><label>To Date</label><input id="lt" type="date" value="${today()}"></div>
  <div class="field"><label>Shift</label><select id="ls"><option>All Shifts</option><option>A Shift (06:00 - 14:00)</option><option>B Shift (14:00 - 22:00)</option><option>C Shift (22:00 - 06:00)</option></select></div>
@@ -281,14 +319,20 @@ function saveReportPdf(){
 }
 function aboutPage(){renderShell("about","About","BSL (HRCF) - SANRAKSH");$("content").innerHTML='<div class="about-card"><img src="sanraksh-icon.png"><h2>BSL (HRCF) - SANRAKSH Maintenance Log System</h2><p>Digital maintenance log, shift crew, employee and daily report platform for HRCF.</p><p><b>Developed & Architected by</b><br>Sunil Kumar Parida<br>Junior Engineer | HRCF<br>SAIL / Bokaro Steel Plant (BSL)</p><p><b>Phone:</b> <a href="tel:7979835047">7979835047</a></p><p><b>Email:</b> <a href="mailto:sunilkumarparida.sail@gmail.com">sunilkumarparida.sail@gmail.com</a></p><p>Fill free to give your valuble feedback and suggection to imptove this website</p></div>'}
 async function syncPage(){
- renderShell("sync","Sync Data","Offline records");await refreshPending();const n=pending.length;
- $("content").innerHTML=`<div class="panel sync-card"><h2>☁ Sync Data</h2><p>Connection: <b>${navigator.onLine?"Online":"Offline"}</b></p><p>Pending records: <b>${n}</b></p><p>${n?"Pending offline records will synchronize automatically when internet is available.":"No pending records."}</p><button class="primary" onclick="syncOfflineQueue().then(syncPage)">↻ Sync Now</button></div>`;
+ renderShell("sync","Sync Data","Offline records");
+ const n=await updateSyncBadge();
+ $("content").innerHTML=`<div class="panel sync-card"><h2>☁ Sync Data</h2><p>Pending records: <b id="pendingCount">${n}</b></p><p>${navigator.onLine?"Internet connection available.":"Offline: records are stored safely on this device."}</p><button class="primary" onclick="manualSync()">Sync Now</button></div>`;
 }
-
-initOffline();
+async function manualSync(){
+ const r=await syncPending();await syncPage();
+ if(r.synced)alert(`${r.synced} offline record(s) synchronized successfully.`);
+ else if(r.remaining)alert("Some records are still pending. They will be retried automatically when internet is available.");
+ else alert("No pending records.");
+}
 
 document.addEventListener("DOMContentLoaded",()=>{
  $("loginForm").onsubmit=e=>{e.preventDefault();login()};$("togglePassword").onclick=toggleEye;$("newUserBtn").onclick=newUser;$("forgotBtn").onclick=forgot;$("resetBtn").onclick=resetPassword;$("forgotBack").onclick=()=>showScreen("loginScreen");$("setupBack").onclick=()=>showScreen("loginScreen");$("setupPass").oninput=passwordRules;$("createPasswordBtn").onclick=createPassword;$("profileType").onchange=loadDesignations;$("saveProfileBtn").onclick=saveProfile;$("profileHomeBtn").onclick=continueHome;$("logoutBtn").onclick=logout;$("menuBtn").onclick=()=>$("sidebar").classList.toggle("open");document.querySelectorAll("#nav button").forEach(b=>b.onclick=()=>openPage(b.dataset.page));
+ openOfflineDb().then(()=>{updateSyncBadge();if(navigator.onLine)setTimeout(syncPending,700)}).catch(()=>{});
  if(session){openProfile(true)}else showScreen("loginScreen");
 });
 if("serviceWorker"in navigator)navigator.serviceWorker.register("./sw.js").catch(()=>{});
