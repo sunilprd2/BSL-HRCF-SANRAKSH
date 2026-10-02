@@ -26,6 +26,58 @@ async function idbAll(store){const db=await openOfflineDb();return new Promise((
 async function idbDelete(store,key){const db=await openOfflineDb();return new Promise((res,rej)=>{const tx=db.transaction(store,"readwrite");tx.objectStore(store).delete(key);tx.oncomplete=()=>res(true);tx.onerror=()=>rej(tx.error);});}
 async function cachePut(key,value){try{await idbPut("cache",{key,value});}catch(e){}}
 async function cacheGet(key,fallback){try{const v=await idbGet("cache",key);return v===undefined?fallback:v;}catch(e){return fallback;}}
+const OFFLINE_AUTH_KEY="remembered-login";
+
+async function deriveOfflineVerifier(password,salt){
+  const enc=new TextEncoder();
+  const key=await crypto.subtle.importKey(
+    "raw",enc.encode(password),"PBKDF2",false,["deriveBits"]
+  );
+  const bits=await crypto.subtle.deriveBits(
+    {name:"PBKDF2",salt:salt,iterations:120000,hash:"SHA-256"},
+    key,256
+  );
+  return Array.from(new Uint8Array(bits))
+    .map(b=>b.toString(16).padStart(2,"0"))
+    .join("");
+}
+
+function randomSalt(){
+  const salt=new Uint8Array(16);
+  crypto.getRandomValues(salt);
+  return salt;
+}
+
+async function saveOfflineAuth(staff,password,serverSession){
+  const salt=randomSalt();
+  const verifier=await deriveOfflineVerifier(password,salt);
+  await idbPut("cache",{
+    key:OFFLINE_AUTH_KEY,
+    value:{
+      staffNo:staff,
+      salt:Array.from(salt),
+      verifier,
+      session:serverSession,
+      savedAt:Date.now()
+    }
+  });
+}
+
+async function getOfflineAuth(){
+  return await cacheGet(OFFLINE_AUTH_KEY,null);
+}
+
+async function verifyOfflinePassword(password,saved){
+  if(!saved?.salt||!saved?.verifier)return false;
+  const salt=new Uint8Array(saved.salt);
+  const verifier=await deriveOfflineVerifier(password,salt);
+  return verifier===saved.verifier;
+}
+
+async function clearOfflineAuth(){
+  try{await idbDelete("cache",OFFLINE_AUTH_KEY)}catch(e){}
+}
+
 function makeClientLogId(){return (crypto?.randomUUID?crypto.randomUUID():("CL-"+Date.now()+"-"+Math.random().toString(36).slice(2,10)));}
 async function queuedCount(){try{return (await idbAll("queue")).length}catch(e){return 0}}
 async function updateSyncBadge(){const n=await queuedCount();const b=$("syncBadge");if(b){b.textContent=String(n);b.classList.toggle("hidden",n===0)}return n;}
