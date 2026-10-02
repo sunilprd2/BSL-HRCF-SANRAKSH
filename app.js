@@ -69,14 +69,86 @@ function setMessage(id,msg,good=false){$(id).textContent=msg;$(id).style.color=g
 function showScreen(id){["loginScreen","setupScreen","profileScreen","forgotScreen","appScreen"].forEach(x=>$(x).classList.add("hidden"));$(id).classList.remove("hidden")}
 function toggleEye(){const x=$("loginPassword");x.type=x.type==="password"?"text":"password"}
 async function login(){
- const staff=$("loginStaffNo").value.trim(),pass=$("loginPassword").value;
- if(!/^\d{6}$/.test(staff)){setMessage("loginMsg","Staff No must be exactly 6 digits.");return}
+ const staff=$("loginStaffNo").value.trim();
+ const pass=$("loginPassword").value;
+ const remember=$("rememberOffline")?.checked===true;
+
+ if(!/^\d{6}$/.test(staff)){
+   setMessage("loginMsg","Staff No must be exactly 6 digits.");
+   return;
+ }
+
+ if(!pass){
+   setMessage("loginMsg","Please enter your password.");
+   return;
+ }
+
+ /* OFFLINE LOGIN */
+ if(!navigator.onLine){
+   try{
+     const saved=await getOfflineAuth();
+
+     if(!saved||saved.staffNo!==staff){
+       setMessage("loginMsg","Offline login is not enabled for this Staff No.");
+       return;
+     }
+
+     const valid=await verifyOfflinePassword(pass,saved);
+
+     if(!valid){
+       setMessage("loginMsg","Invalid Staff No or Password.");
+       return;
+     }
+
+     session=saved.session;
+     localStorage.setItem("sanrakshSession",JSON.stringify(session));
+
+     setMessage("loginMsg","Offline login successful.",true);
+     await openProfile(true);
+     return;
+
+   }catch(e){
+     setMessage("loginMsg","Offline login is not available on this device.");
+     return;
+   }
+ }
+
+ /* NORMAL ONLINE LOGIN */
  setMessage("loginMsg","Checking...",true);
- try{const r=await api("login",{staffNo:staff,password:pass});if(!r.success){setMessage("loginMsg",r.message||"Login failed.");return}
- session=r;localStorage.setItem("sanrakshSession",JSON.stringify(r));
- if(r.firstTime){openPasswordSetup(staff);return}
- await openProfile(true);
- }catch(e){setMessage("loginMsg","Connection error. Please check API URL.");}
+
+ try{
+   const r=await api("login",{staffNo:staff,password:pass});
+
+   if(!r.success){
+     setMessage("loginMsg",r.message||"Login failed.");
+     return;
+   }
+
+   session=r;
+   localStorage.setItem("sanrakshSession",JSON.stringify(r));
+
+   /*
+      Do not remember the temporary first-time login.
+      Save the offline login only after the normal password
+      has already been established.
+   */
+   if(r.firstTime){
+     await clearOfflineAuth();
+     openPasswordSetup(staff);
+     return;
+   }
+
+   if(remember){
+     await saveOfflineAuth(staff,pass,r);
+   }else{
+     await clearOfflineAuth();
+   }
+
+   await openProfile(true);
+
+ }catch(e){
+   setMessage("loginMsg","Connection error. Please check API URL.");
+ }
 }
 function openPasswordSetup(staff){$("setupStaff").value=staff;showScreen("setupScreen");$("setupPass").value="";$("setupConfirm").value="";passwordRules()}
 function passwordRules(){const p=$("setupPass").value;const tests=[["r1",p.length>=8,"Minimum 8 characters"],["r2",/[A-Z]/.test(p),"One capital letter"],["r3",/[a-z]/.test(p),"One small letter"],["r4",/[0-9]/.test(p),"One number"],["r5",/[^A-Za-z0-9]/.test(p),"One special character"]];tests.forEach(t=>{$(t[0]).textContent=(t[1]?"✓ ":"✗ ")+t[2];$(t[0]).className=t[1]?"good":""})}
@@ -331,7 +403,20 @@ async function manualSync(){
 }
 
 document.addEventListener("DOMContentLoaded",()=>{
- $("loginForm").onsubmit=e=>{e.preventDefault();login()};$("togglePassword").onclick=toggleEye;$("newUserBtn").onclick=newUser;$("forgotBtn").onclick=forgot;$("resetBtn").onclick=resetPassword;$("forgotBack").onclick=()=>showScreen("loginScreen");$("setupBack").onclick=()=>showScreen("loginScreen");$("setupPass").oninput=passwordRules;$("createPasswordBtn").onclick=createPassword;$("profileType").onchange=loadDesignations;$("saveProfileBtn").onclick=saveProfile;$("profileHomeBtn").onclick=continueHome;$("logoutBtn").onclick=logout;$("menuBtn").onclick=()=>$("sidebar").classList.toggle("open");document.querySelectorAll("#nav button").forEach(b=>b.onclick=()=>openPage(b.dataset.page));
+ $("loginForm").onsubmit=e=>{e.preventDefault();login()};$("togglePassword").onclick=toggleEye;
+
+ const rememberOffline=$("rememberOffline");
+ if(rememberOffline){
+   getOfflineAuth().then(saved=>{
+     rememberOffline.checked=!!saved;
+   }).catch(()=>{});
+
+   rememberOffline.addEventListener("change",async()=>{
+     if(!rememberOffline.checked){
+       await clearOfflineAuth();
+     }
+   });
+ }$("newUserBtn").onclick=newUser;$("forgotBtn").onclick=forgot;$("resetBtn").onclick=resetPassword;$("forgotBack").onclick=()=>showScreen("loginScreen");$("setupBack").onclick=()=>showScreen("loginScreen");$("setupPass").oninput=passwordRules;$("createPasswordBtn").onclick=createPassword;$("profileType").onchange=loadDesignations;$("saveProfileBtn").onclick=saveProfile;$("profileHomeBtn").onclick=continueHome;$("logoutBtn").onclick=logout;$("menuBtn").onclick=()=>$("sidebar").classList.toggle("open");document.querySelectorAll("#nav button").forEach(b=>b.onclick=()=>openPage(b.dataset.page));
  openOfflineDb().then(()=>{updateSyncBadge();if(navigator.onLine)setTimeout(syncPending,700)}).catch(()=>{});
  if(session){openProfile(true)}else showScreen("loginScreen");
 });
