@@ -1,4 +1,4 @@
-const CACHE = "sanraksh-v7";
+const CACHE = "sanraksh-v8";
 const ASSETS = [
   "./",
   "./index.html",
@@ -35,32 +35,41 @@ self.addEventListener("fetch", event => {
   const request = event.request;
   if (request.method !== "GET") return;
 
+  const url = new URL(request.url);
+  if (url.origin !== self.location.origin) return;
+
+  // Open the PWA immediately from cache. Update the cached index in the background.
   if (request.mode === "navigate") {
     event.respondWith(
-      fetch(request)
-        .then(response => {
-          const copy = response.clone();
-          caches.open(CACHE).then(cache => cache.put("./index.html", copy));
-          return response;
-        })
-        .catch(() => caches.match("./index.html"))
+      caches.match("./index.html").then(cached => {
+        const network = fetch(request)
+          .then(response => {
+            if (response && response.ok) {
+              const copy = response.clone();
+              caches.open(CACHE).then(cache => cache.put("./index.html", copy));
+            }
+            return response;
+          })
+          .catch(() => cached);
+
+        return cached || network;
+      })
     );
     return;
   }
 
-  const url = new URL(request.url);
-  if (url.origin === self.location.origin) {
-    event.respondWith(
-      caches.match(request).then(cached => {
-        if (cached) return cached;
-        return fetch(request).then(response => {
-          if (response.ok) {
-            const copy = response.clone();
-            caches.open(CACHE).then(cache => cache.put(request, copy));
-          }
-          return response;
-        });
-      })
-    );
-  }
+  // Static assets: cache first for fast repeat loading, then fetch/cache misses.
+  event.respondWith(
+    caches.match(request).then(cached => {
+      if (cached) return cached;
+
+      return fetch(request).then(response => {
+        if (response && response.ok) {
+          const copy = response.clone();
+          caches.open(CACHE).then(cache => cache.put(request, copy));
+        }
+        return response;
+      });
+    })
+  );
 });
