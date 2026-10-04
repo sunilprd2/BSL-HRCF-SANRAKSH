@@ -59,6 +59,10 @@ body.dark-mode .about-card a{color:inherit;text-decoration:none;pointer-events:n
 .about-panel{background:#f8fafc;border:1px solid #dce4ee;border-radius:9px;padding:16px}
 .about-panel h2{margin:0 0 8px;color:#16324f;font-size:18px}.about-panel hr{border:0;border-top:2px solid #cbd5e1;margin:0 0 12px}.about-panel p,.about-panel li{line-height:1.7}
 body.dark-mode .about-panel{background:#202c40;border-color:#3b4b63}.about-panel ul{margin:0;padding-left:22px}
+/* Dark mode fix: About Purpose/Key Features text visibility only */
+body.dark-mode .about-grid section{background:#202d42;border-color:#3a4b65;color:#f1f5f9}
+body.dark-mode .about-grid section h3{color:#60a5fa}
+body.dark-mode .about-grid section p,body.dark-mode .about-grid section li{color:#f1f5f9}
 @media(max-width:800px){.about-two-col{grid-template-columns:1fr}.about-card{padding:16px}}
 
 /* V11 colorful navigation and quick-action icons */
