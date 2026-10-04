@@ -506,49 +506,35 @@
 
 
     <!-- NAVIGATION -->
-    <nav id="nav">
+    
+<!-- Colorful SANRAKSH navigation icon sprite -->
+<svg class="icon-sprite" aria-hidden="true">
+<defs>
+ <linearGradient id="gBlue" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#38bdf8"/><stop offset="1" stop-color="#2563eb"/></linearGradient>
+ <linearGradient id="gGreen" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#86efac"/><stop offset="1" stop-color="#16a34a"/></linearGradient>
+ <linearGradient id="gOrange" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#fde68a"/><stop offset="1" stop-color="#f97316"/></linearGradient>
+ <linearGradient id="gCyan" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#67e8f9"/><stop offset="1" stop-color="#0891b2"/></linearGradient>
+ <linearGradient id="gPurple" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#c4b5fd"/><stop offset="1" stop-color="#7c3aed"/></linearGradient>
+ <symbol id="icon-home" viewBox="0 0 64 64"><path fill="url(#gBlue)" stroke="#0b4fd1" stroke-width="2" d="M8 29 32 9l24 20v25H38V39H26v15H8z"/><path fill="#fde047" d="M24 27h6v6h-6zm10 0h6v6h-6zm-10 9h6v6h-6zm10 0h6v6h-6z"/><path fill="#fff" d="M29 43h6v11h-6z"/></symbol>
+ <symbol id="icon-add" viewBox="0 0 64 64"><rect x="9" y="7" width="37" height="49" rx="6" fill="#fff" stroke="url(#gBlue)" stroke-width="4"/><path stroke="#2563eb" stroke-width="3" stroke-linecap="round" d="M18 21h20M18 30h16M18 39h12"/><circle cx="47" cy="46" r="13" fill="url(#gGreen)" stroke="#15803d" stroke-width="2"/><path stroke="#fff" stroke-width="4" stroke-linecap="round" d="M47 39v14M40 46h14"/></symbol>
+ <symbol id="icon-logs" viewBox="0 0 64 64"><rect x="10" y="7" width="44" height="50" rx="6" fill="#fff" stroke="url(#gBlue)" stroke-width="4"/><rect x="17" y="18" width="7" height="7" rx="2" fill="#2563eb"/><rect x="17" y="29" width="7" height="7" rx="2" fill="#22c55e"/><rect x="17" y="40" width="7" height="7" rx="2" fill="#facc15"/><path stroke="#64748b" stroke-width="3" stroke-linecap="round" d="M29 21h17M29 32h17M29 43h17"/></symbol>
+ <symbol id="icon-employee" viewBox="0 0 64 64"><circle cx="32" cy="20" r="11" fill="#fed7aa"/><path fill="#facc15" d="M19 18c1-11 25-14 27 0H19z"/><path fill="url(#gBlue)" stroke="#2563eb" stroke-width="2" d="M14 55c2-15 10-20 18-20s16 5 18 20z"/><path fill="#f8fafc" d="M28 36h8v19h-8z"/></symbol>
+ <symbol id="icon-shift" viewBox="0 0 64 64"><rect x="8" y="12" width="40" height="40" rx="6" fill="#fff" stroke="#ef4444" stroke-width="4"/><path fill="#ef4444" d="M8 19h40V13a6 6 0 0 0-6-6H14a6 6 0 0 0-6 6z"/><circle cx="19" cy="29" r="4" fill="#22c55e"/><circle cx="30" cy="29" r="4" fill="#facc15"/><circle cx="41" cy="29" r="4" fill="#06b6d4"/><circle cx="19" cy="41" r="4" fill="#2563eb"/><circle cx="30" cy="41" r="4" fill="#94a3b8"/><circle cx="50" cy="47" r="11" fill="url(#gBlue)" stroke="#2563eb" stroke-width="2"/><path stroke="#fff" stroke-width="3" stroke-linecap="round" d="M50 41v7l5 3"/></symbol>
+ <symbol id="icon-reports" viewBox="0 0 64 64"><rect x="9" y="7" width="45" height="50" rx="6" fill="#fff" stroke="url(#gBlue)" stroke-width="4"/><rect x="18" y="38" width="7" height="10" rx="2" fill="#2563eb"/><rect x="29" y="30" width="7" height="18" rx="2" fill="#22c55e"/><rect x="40" y="20" width="7" height="28" rx="2" fill="#ef4444"/><path stroke="#64748b" stroke-width="3" stroke-linecap="round" d="M18 51h29"/></symbol>
+ <symbol id="icon-about" viewBox="0 0 64 64"><circle cx="32" cy="32" r="25" fill="url(#gBlue)" stroke="#0ea5e9" stroke-width="3"/><circle cx="32" cy="21" r="5" fill="#fff"/><rect x="28" y="29" width="8" height="20" rx="4" fill="#fff"/></symbol>
+ <symbol id="icon-sync" viewBox="0 0 64 64"><path d="M18 46h29a11 11 0 0 0 1-22 17 17 0 0 0-32-3A13 13 0 0 0 18 46z" fill="#fff" stroke="url(#gBlue)" stroke-width="4"/><path d="M21 37a12 12 0 0 0 20 5l4-4" fill="none" stroke="#22c55e" stroke-width="5" stroke-linecap="round"/><path d="m45 32 1 7-7-1" fill="none" stroke="#22c55e" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/><path d="M43 27a12 12 0 0 0-20 5l-4 4" fill="none" stroke="#2563eb" stroke-width="5" stroke-linecap="round"/><path d="m19 32-1-7 7 1" fill="none" stroke="#2563eb" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+</defs>
+</svg>
 
-      <button data-page="home">
-        ⌂ <span>Home</span>
-      </button>
-
-      <button data-page="addLog">
-        ▣ <span>Add Log</span>
-      </button>
-
-      <button data-page="logs">
-        ▤ <span>View Logs</span>
-      </button>
-
-      <button data-page="employees">
-        ♟ <span>Employee Details</span>
-      </button>
-
-      <button data-page="shifts">
-        ▦ <span>Shift Details</span>
-      </button>
-
-      <button data-page="reports">
-        ▥ <span>Reports</span>
-      </button>
-
-      <button data-page="about">
-        ⓘ <span>About</span>
-      </button>
-
-      <button data-page="sync">
-
-        ☁ <span>Sync Data</span>
-
-        <b
-          id="syncBadge"
-          class="badge"
-        >
-          0
-        </b>
-
-      </button>
-
+<nav id="nav">
+      <button data-page="home"><svg class="nav-icon"><use href="#icon-home"/></svg><span>Home</span></button>
+      <button data-page="addLog"><svg class="nav-icon"><use href="#icon-add"/></svg><span>Add Log</span></button>
+      <button data-page="logs"><svg class="nav-icon"><use href="#icon-logs"/></svg><span>View Logs</span></button>
+      <button data-page="employees"><svg class="nav-icon"><use href="#icon-employee"/></svg><span>Employee Details</span></button>
+      <button data-page="shifts"><svg class="nav-icon"><use href="#icon-shift"/></svg><span>Shift Details</span></button>
+      <button data-page="reports"><svg class="nav-icon"><use href="#icon-reports"/></svg><span>Reports</span></button>
+      <button data-page="about"><svg class="nav-icon"><use href="#icon-about"/></svg><span>About</span></button>
+      <button data-page="sync"><svg class="nav-icon"><use href="#icon-sync"/></svg><span>Sync Data</span><b id="syncBadge" class="badge">0</b></button>
     </nav>
 
 
@@ -576,6 +562,8 @@
       >
         ☰
       </button>
+
+      <button id="themeToggle" class="theme-toggle" type="button" aria-label="Toggle dark mode" title="Toggle dark mode">☀</button>
 
 
       <div

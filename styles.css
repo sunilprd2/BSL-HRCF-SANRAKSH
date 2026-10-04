@@ -15,43 +15,41 @@ label{display:block;text-align:left;font-size:13px;font-weight:700;margin:11px 0
 .great-place-img{width:120px;height:auto;object-fit:contain;filter:drop-shadow(0 2px 4px #0004)}
 .login-top{align-items:flex-start}
 
+/* ===== SANRAKSH V10 colorful navigation + accessible dark mode ===== */
+.icon-sprite{position:absolute;width:0;height:0;overflow:hidden}
+#nav button{display:flex;align-items:center;gap:13px}
+.nav-icon{width:29px;height:29px;min-width:29px;overflow:visible;filter:drop-shadow(0 2px 3px #0004)}
+#nav button:hover .nav-icon{transform:scale(1.08);transition:transform .15s ease}
+#nav button.active .nav-icon{filter:drop-shadow(0 2px 5px #60a5fa88)}
+.theme-toggle{width:38px;height:34px;border:1px solid #ffffff55;border-radius:9px;background:#ffffff18;color:#fff;font-size:18px;display:inline-flex;align-items:center;justify-content:center}
+.theme-toggle:hover{background:#ffffff30}
+body.dark-mode{--bg:#0b1220;--text:#e8eef8;--muted:#a9b6c8}
+body.dark-mode .panel,
+body.dark-mode .about-card,
+body.dark-mode .setup-card,
+body.dark-mode .current-grid div{background:#182235;color:#eef4ff;border-color:#334155}
+body.dark-mode .about-card{box-shadow:0 4px 18px #0006}
+body.dark-mode .about-card h2,
+body.dark-mode .about-card h3{color:#60a5fa}
+body.dark-mode .about-card p,
+body.dark-mode .about-card li,
+body.dark-mode .about-card b,
+body.dark-mode .about-card strong{color:#f1f5f9}
+body.dark-mode .about-card .developer-box{background:linear-gradient(135deg,#1d4f87,#15365d);color:#fff;border-color:#3b82f6}
+body.dark-mode input,body.dark-mode select,body.dark-mode textarea{background:#0f172a;color:#f8fafc;border-color:#475569}
+body.dark-mode .page-title{color:#60a5fa}
+body.dark-mode .data-table th{background:#172033;color:#e2e8f0}
+body.dark-mode .data-table td{border-color:#334155}
+body.dark-mode .sidebar{background:#0b1220}
+body.dark-mode .sidebar-brand{border-color:#24334a}
+body.dark-mode .topbar{background:#075fc5}
+body.dark-mode .about-card a{color:inherit;text-decoration:none;pointer-events:none}
+.about-card .developer-box{background:linear-gradient(135deg,#dbeafe,#bfdbfe);border:1px solid #93c5fd;border-radius:10px;padding:18px;text-align:center;font-weight:700;color:#063d76;margin-top:18px}
+.about-card .developer-box p{margin:5px 0;color:inherit}
+@media(max-width:800px){.nav-icon{width:31px;height:31px;min-width:31px}.theme-toggle{margin-left:auto}}
 
-/* ===== SANRAKSH V9 THEME ===== */
-.theme-toggle{margin-left:10px;border:1px solid #ffffff55;background:#ffffff18;color:#fff;width:38px;height:34px;border-radius:8px;font-size:19px;display:inline-flex;align-items:center;justify-content:center;cursor:pointer}
-[data-theme="dark"]{--bg:#0f172a;--text:#e5edf7;--muted:#94a3b8}
-[data-theme="dark"] body{background:#0f172a;color:#e5edf7}
-[data-theme="dark"] .sidebar{background:#111827;border-color:#263449}
-[data-theme="dark"] .sidebar-brand{border-color:#263449}
-[data-theme="dark"] .sidebar-brand strong{color:#8fc1ff}
-[data-theme="dark"] #nav button{background:#111827;color:#dbe7f5}
-[data-theme="dark"] #nav button:hover,[data-theme="dark"] #nav button.active{background:#17345b;color:#78b5ff}
-[data-theme="dark"] .main{background:#0f172a}
-[data-theme="dark"] .current-card,[data-theme="dark"] .panel,[data-theme="dark"] .about-card{background:#172033;border-color:#2b3a50;color:#e5edf7}
-[data-theme="dark"] .current-grid div{background:#202c40}
-[data-theme="dark"] input,[data-theme="dark"] select,[data-theme="dark"] textarea{background:#111827;color:#e5edf7;border-color:#3b4a61}
-[data-theme="dark"] input:focus,[data-theme="dark"] select:focus,[data-theme="dark"] textarea:focus{border-color:#4f9cff}
-[data-theme="dark"] .data-table th{background:#202c40;color:#d9e9ff}
-[data-theme="dark"] .data-table td{border-color:#2b3a50}
-[data-theme="dark"] .report-time div{background:#111827;border-color:#3b4a61}
-[data-theme="dark"] .setup-screen{background:#0f172a}
-[data-theme="dark"] .setup-card{background:#172033;border-color:#2b3a50;color:#e5edf7}
-[data-theme="dark"] .setup-heading{color:#8fc1ff;border-color:#334155}
-[data-theme="dark"] .setup-sub{color:#a7b5c8}
-[data-theme="dark"] .rules{background:#202c40;border-color:#334155}
-[data-theme="dark"] .profile-setup input[readonly]{background:#202c40;color:#cbd5e1}
-[data-theme="dark"] .about-box{background:#202c40;border-color:#334155}
-[data-theme="dark"] .about-developer{background:#1d4f82}
-[data-theme="dark"] .about-feedback{color:#dbe7f5}
-.about-exact{text-align:center;padding:28px}
-.about-exact>img{margin-bottom:5px}
-.about-exact h1{color:#075fc5;margin:0 0 4px;font-size:27px}
-.about-version{font-weight:700;margin-bottom:25px}
-.about-grid{display:grid;grid-template-columns:1fr 1fr;gap:20px;text-align:left}
-.about-box{border:1px solid #dce4ee;background:#f8fafc;border-radius:8px;padding:20px;min-height:190px}
-.about-box h3{margin:0 0 12px;padding-bottom:10px;border-bottom:2px solid #d1d5db}
-.about-box p{font-size:17px;line-height:1.75;margin:0}
-.about-box li{margin:8px 0}
-.about-developer{margin-top:28px;background:#d9ecff;color:#07509b;border-radius:8px;padding:18px;font-size:15px;line-height:1.8;font-weight:600}
-.about-feedback{margin-top:17px;font-size:16px;font-weight:600;color:#34516d}
-.about-contact{pointer-events:none;user-select:text}
-@media(max-width:800px){.about-grid{grid-template-columns:1fr}.about-exact{padding:18px}.about-exact h1{font-size:22px}.about-box p{font-size:15px}.about-developer{font-size:13px}}
+.about-two-col{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+.about-panel{background:#f8fafc;border:1px solid #dce4ee;border-radius:9px;padding:16px}
+.about-panel h2{margin:0 0 8px;color:#16324f;font-size:18px}.about-panel hr{border:0;border-top:2px solid #cbd5e1;margin:0 0 12px}.about-panel p,.about-panel li{line-height:1.7}
+body.dark-mode .about-panel{background:#202c40;border-color:#3b4b63}.about-panel ul{margin:0;padding-left:22px}
+@media(max-width:800px){.about-two-col{grid-template-columns:1fr}.about-card{padding:16px}}

@@ -5,27 +5,6 @@ const today=()=>new Date().toISOString().slice(0,10);
 const shifts=[{name:"A Shift",start:"06:00",end:"14:00",cls:"a"},{name:"B Shift",start:"14:00",end:"22:00",cls:"b"},{name:"C Shift",start:"22:00",end:"06:00",cls:"c"}];
 let session=null,employees=[],areas=[],equipment=[],pending=[];
 let cachedProfile=null;
-let profileReturnPage="home";
-const SESSION_STORAGE_KEY="sanrakshSession";
-const PAGE_STORAGE_KEY="sanrakshPage";
-const ACTIVITY_STORAGE_KEY="sanrakshLastActivity";
-const PROFILE_CACHE_PREFIX="sanrakshProfile_";
-const IDLE_TIMEOUT_MS=10*60*1000;
-let idleTimer=null;
-
-function profileCacheKey(staffNo){return PROFILE_CACHE_PREFIX+String(staffNo||"").trim();}
-async function getCachedProfile(staffNo){if(!staffNo)return null;return await cacheGet(profileCacheKey(staffNo),null);}
-async function saveCachedProfile(p){if(!p||!p.staffNo)return;await cachePut(profileCacheKey(p.staffNo),p);}
-function setPageState(page){try{localStorage.setItem(PAGE_STORAGE_KEY,page)}catch(e){}}
-function getPageState(){try{return localStorage.getItem(PAGE_STORAGE_KEY)||"home"}catch(e){return "home"}}
-function clearSessionState(){try{localStorage.removeItem(SESSION_STORAGE_KEY);localStorage.removeItem(PAGE_STORAGE_KEY);localStorage.removeItem(ACTIVITY_STORAGE_KEY)}catch(e){}session=null;if(idleTimer)clearTimeout(idleTimer);idleTimer=null;}
-function touchSessionActivity(){if(!session)return;try{localStorage.setItem(ACTIVITY_STORAGE_KEY,String(Date.now()))}catch(e){}scheduleIdleLogout();}
-function scheduleIdleLogout(){if(idleTimer)clearTimeout(idleTimer);if(!session)return;let last=0;try{last=Number(localStorage.getItem(ACTIVITY_STORAGE_KEY)||0)}catch(e){}if(!last)last=Date.now();const remaining=IDLE_TIMEOUT_MS-(Date.now()-last);if(remaining<=0){autoLogout();return;}idleTimer=setTimeout(checkIdleTimeout,remaining+50);}
-function checkIdleTimeout(){if(!session)return;let last=0;try{last=Number(localStorage.getItem(ACTIVITY_STORAGE_KEY)||0)}catch(e){}if(!last||Date.now()-last>=IDLE_TIMEOUT_MS){autoLogout();return;}scheduleIdleLogout();}
-function autoLogout(){clearSessionState();showScreen("loginScreen");const msg=$("loginMsg");if(msg)msg.textContent="You have been logged out after 10 minutes of inactivity.";}
-function bindActivityTracking(){const events=["click","keydown","pointerdown","touchstart","scroll"];let lastEvent=0;const handler=()=>{if(!session)return;const now=Date.now();if(now-lastEvent<1000)return;lastEvent=now;touchSessionActivity()};events.forEach(ev=>document.addEventListener(ev,handler,{passive:true}));document.addEventListener("visibilitychange",()=>{if(session)checkIdleTimeout()});window.addEventListener("focus",()=>{if(session)checkIdleTimeout()});}
-function saveSession(r){session=r||null;if(session){try{localStorage.setItem(SESSION_STORAGE_KEY,JSON.stringify(session))}catch(e){}touchSessionActivity();}}
-function loadStoredSession(){try{const raw=localStorage.getItem(SESSION_STORAGE_KEY);if(!raw)return null;const s=JSON.parse(raw);return s&&s.staffNo?s:null}catch(e){return null}}
 
 /* =========================================================
    OFFLINE-FIRST STORAGE / AUTOMATIC SYNC
@@ -174,10 +153,10 @@ async function login(){
      }
 
      session=saved.session;
-     saveSession(session);
+     localStorage.setItem("sanrakshSession",JSON.stringify(session));
 
      setMessage("loginMsg","Offline login successful.",true);
-     await routeAfterLogin();
+     await openProfile(true);
      return;
 
    }catch(e){
@@ -198,7 +177,7 @@ async function login(){
    }
 
    session=r;
-   saveSession(r);
+   localStorage.setItem("sanrakshSession",JSON.stringify(r));
 
    /*
       Do not remember the temporary first-time login.
@@ -217,7 +196,7 @@ async function login(){
      await clearOfflineAuth();
    }
 
-   await routeAfterLogin();
+   await openProfile(true);
    setTimeout(preloadOfflineData,300);
 
  }catch(e){
@@ -226,41 +205,36 @@ async function login(){
 }
 function openPasswordSetup(staff){$("setupStaff").value=staff;showScreen("setupScreen");$("setupPass").value="";$("setupConfirm").value="";passwordRules()}
 function passwordRules(){const p=$("setupPass").value;const tests=[["r1",p.length>=8,"Minimum 8 characters"],["r2",/[A-Z]/.test(p),"One capital letter"],["r3",/[a-z]/.test(p),"One small letter"],["r4",/[0-9]/.test(p),"One number"],["r5",/[^A-Za-z0-9]/.test(p),"One special character"]];tests.forEach(t=>{$(t[0]).textContent=(t[1]?"✓ ":"✗ ")+t[2];$(t[0]).className=t[1]?"good":""})}
-async function createPassword(){const s=$("setupStaff").value.trim(),p=$("setupPass").value,c=$("setupConfirm").value;if(p!==c){setMessage("setupMsg","Passwords do not match.");return}try{const r=await api("setFirstPassword",{staffNo:s,password:p});if(!r.success){setMessage("setupMsg",r.message);return}const l=await api("login",{staffNo:s,password:p});saveSession(l);await openProfile(false)}catch(e){setMessage("setupMsg","Connection error.")}}async function newUser(){const s=prompt("Enter your 6 digit Staff No:");if(!s)return;if(!/^\d{6}$/.test(s)){alert("Staff No must be exactly 6 digits.");return}try{const r=await api("newUser",{staffNo:s});if(!r.success){alert(r.message||"Staff No not available.");return}$("loginStaffNo").value=s;$("loginPassword").value="";openPasswordSetup(s)}catch(e){alert("Connection error.")}}
+async function createPassword(){const s=$("setupStaff").value.trim(),p=$("setupPass").value,c=$("setupConfirm").value;if(p!==c){setMessage("setupMsg","Passwords do not match.");return}try{const r=await api("setFirstPassword",{staffNo:s,password:p});if(!r.success){setMessage("setupMsg",r.message);return}const l=await api("login",{staffNo:s,password:p});session=l;localStorage.setItem("sanrakshSession",JSON.stringify(l));await openProfile(false)}catch(e){setMessage("setupMsg","Connection error.")}}
+async function newUser(){const s=prompt("Enter your 6 digit Staff No:");if(!s)return;if(!/^\d{6}$/.test(s)){alert("Staff No must be exactly 6 digits.");return}try{const r=await api("newUser",{staffNo:s});if(!r.success){alert(r.message||"Staff No not available.");return}$("loginStaffNo").value=s;$("loginPassword").value="";openPasswordSetup(s)}catch(e){alert("Connection error.")}}
 async function forgot(){showScreen("forgotScreen");$("forgotStaff").value=$("loginStaffNo").value}
 async function resetPassword(){const s=$("forgotStaff").value.trim();try{const r=await api("requestPasswordReset",{staffNo:s});setMessage("forgotMsg",r.message||"Request submitted.",!!r.success)}catch(e){setMessage("forgotMsg","Connection error.")}}
 
-async function openProfile(afterLogin=false){
+async function openProfile(afterLogin){
  showScreen("profileScreen");$("profileStaffNo").value=session.staffNo||"";setMessage("profileMsg","Loading saved details...",true);
  try{
-  const p=await api("profile",{staffNo:session.staffNo},"GET");cachedProfile=p||{};await saveCachedProfile({...cachedProfile,staffNo:session.staffNo});fillProfileForm(cachedProfile);
-  const has=profileComplete(cachedProfile);
-  setMessage("profileMsg",has?"Saved employee details loaded. You may edit permitted fields or continue to Home.":"Please complete your employee details before entering the system.",true);$("profileHomeBtn").disabled=!has;
+  const p=await api("profile",{staffNo:session.staffNo},"GET");cachedProfile=p||{};
+  $("profileName").value=p.name||session.name||"";$("profileEmail").value=p.email||session.email||"";
+  const ds=p.department||"",ty=p.employeeType||"",dg=p.designation||"",mob=p.mobile||"";
+  const deps=p.departments||["Electrical","Mechanical","Operation","Others"];
+  $("profileDepartment").innerHTML='<option value="">Select Department</option>'+deps.map(x=>`<option>${esc(x)}</option>`).join("");$("profileDepartment").value=ds;
+  $("profileType").value=ty;loadDesignations();$("profileDesignation").value=dg;$("profileMobile").value=mob;
+  const has=!!(p.department&&p.mobile&&p.employeeType&&p.designation);
+  setMessage("profileMsg",has?"Saved employee details loaded. You may edit permitted fields or continue to Home.":"Please complete your employee details before entering the system.",true);
+  $("profileHomeBtn").disabled=!has;
  }catch(e){
-  const cached=await getCachedProfile(session.staffNo);const p=cached||session;
-  if(profileComplete(p)){cachedProfile=p;fillProfileForm(p);$("profileHomeBtn").disabled=false;setMessage("profileMsg","Offline mode: using saved Employee Details.",true);}
-  else{fillProfileForm(p||{});$("profileHomeBtn").disabled=true;setMessage("profileMsg","Please complete your Employee Details before entering the system.");}
+  if(session?.department&&session?.mobile&&session?.employeeType&&session?.designation){
+    const p={name:session.name||"",email:session.email||"",department:session.department,mobile:session.mobile,employeeType:session.employeeType,designation:session.designation,departments:["Electrical","Mechanical","Operation","Others"]};
+    cachedProfile=p;$("profileName").value=p.name;$("profileEmail").value=p.email;$("profileDepartment").innerHTML='<option value="">Select Department</option>'+p.departments.map(x=>`<option>${esc(x)}</option>`).join("");$("profileDepartment").value=p.department;$("profileType").value=p.employeeType;loadDesignations();$("profileDesignation").value=p.designation;$("profileMobile").value=p.mobile;$("profileHomeBtn").disabled=false;setMessage("profileMsg","Offline mode: using saved Employee Details.",true);
+  }else setMessage("profileMsg","Employee Details are not cached. Connect to internet once to initialize offline mode.");
  }}
-function profileComplete(p){return !!(p&&p.department&&p.mobile&&p.employeeType&&p.designation);}
-function fillProfileForm(p){p=p||{};$("profileName").value=p.name||session?.name||"";$("profileEmail").value=p.email||session?.email||"";const deps=p.departments||["Electrical","Mechanical","Operation","Others"];$("profileDepartment").innerHTML='<option value="">Select Department</option>'+deps.map(x=>`<option>${esc(x)}</option>`).join("");$("profileDepartment").value=p.department||"";$("profileType").value=p.employeeType||"";loadDesignations();$("profileDesignation").value=p.designation||"";$("profileMobile").value=p.mobile||"";}
-async function routeAfterLogin(){
- const p=await getCachedProfile(session.staffNo);if(p)cachedProfile=p;
- if(!profileComplete(cachedProfile||{})){
-  if(navigator.onLine){try{const fresh=await api("profile",{staffNo:session.staffNo},"GET");cachedProfile=fresh||{};await saveCachedProfile({...cachedProfile,staffNo:session.staffNo});if(profileComplete(cachedProfile)){return openPage(getPageState())} }catch(e){}}
-  if(!profileComplete(cachedProfile||session)){await openProfile(true);return;}
- }
- const target=getPageState();openPage(["home","addLog","logs","employees","shifts","reports","about","sync"].includes(target)?target:"home");
-}
 function loadDesignations(){const t=$("profileType").value;const d={Executive:["Assistant Manager","Manager","Senior Manager","Assistant General Manager (AGM)","Deputy General Manager (DGM)"],"Non-Executive":["Jr. Engineer","Engineering Associate","Jr. Engineering Associate","Technical Associate"],"Contract Worker":["Contract Worker"]}[t]||[];$("profileDesignation").innerHTML='<option value="">Select Designation</option>'+d.map(x=>`<option>${esc(x)}</option>`).join("")}
-async function saveProfile(){
- const details={staffNo:session.staffNo,sessionToken:session.sessionToken,name:$("profileName").value,department:$("profileDepartment").value,mobile:$("profileMobile").value.trim(),employeeType:$("profileType").value,designation:$("profileDesignation").value,email:$("profileEmail").value};
- if(!details.department||!/^[0-9]{10}$/.test(details.mobile)||!details.employeeType||!details.designation){setMessage("profileMsg","Please complete all employee details correctly.");return}
- try{const r=await api("saveProfile",{details});if(!r.success){setMessage("profileMsg",r.message);return}cachedProfile=r;await saveCachedProfile(r);session={...session,name:r.name,department:r.department,mobile:r.mobile,employeeType:r.employeeType,designation:r.designation};saveSession(session);setMessage("profileMsg","Employee details saved successfully.",true);$("profileHomeBtn").disabled=false;setTimeout(()=>{const target=profileReturnPage==="employees"?"employees":"home";profileReturnPage="home";openPage(target)},500)}catch(e){setMessage("profileMsg","Connection error.")}}
+async function saveProfile(){const details={staffNo:session.staffNo,sessionToken:session.sessionToken,name:$("profileName").value,department:$("profileDepartment").value,mobile:$("profileMobile").value.trim(),employeeType:$("profileType").value,designation:$("profileDesignation").value,email:$("profileEmail").value};if(!details.department||!/^\d{10}$/.test(details.mobile)||!details.employeeType||!details.designation){setMessage("profileMsg","Please complete all employee details correctly.");return}try{const r=await api("saveProfile",{details});if(!r.success){setMessage("profileMsg",r.message);return}cachedProfile=r;session={...session,name:r.name,department:r.department,mobile:r.mobile,employeeType:r.employeeType,designation:r.designation};localStorage.setItem("sanrakshSession",JSON.stringify(session));setMessage("profileMsg","Employee details saved successfully.",true);$("profileHomeBtn").disabled=false;setTimeout(home,500)}catch(e){setMessage("profileMsg","Connection error.")}}
 function continueHome(){home()}
-function logout(){clearSessionState();showScreen("loginScreen");$("loginPassword").value="";setMessage("loginMsg","Logged out successfully.",true)}
+function logout(){localStorage.removeItem("sanrakshSession");session=null;location.reload()}
 
 function statusPill(s){const c=String(s||"").toLowerCase();return `<span class="status-pill ${c}">${esc(s||"")}</span>`}
-function renderShell(page,title,sub=""){showScreen("appScreen");setPageState(page);document.querySelectorAll("#nav button").forEach(b=>b.classList.toggle("active",b.dataset.page===page));$("topTitle").innerHTML=`${esc(title)}<br><small>${esc(sub)}</small>`;$("topUser").textContent=session?.name||session?.staffNo||"●";touchSessionActivity()}
+function renderShell(page,title,sub=""){showScreen("appScreen");document.querySelectorAll("#nav button").forEach(b=>b.classList.toggle("active",b.dataset.page===page));$("topTitle").innerHTML=`${esc(title)}<br><small>${esc(sub)}</small>`;$("topUser").textContent=session?.name||session?.staffNo||"●"}
 function home(){
  renderShell("home","BSL (HRCF) - SANRAKSH","Maintenance Log System");
  $("content").innerHTML='<div class="loading panel">Loading dashboard...</div>';
@@ -398,9 +372,8 @@ async function preloadOfflineData(){
 }
 
 async function employeesPage(){
- renderShell("employees","Employee Details","Your details and employees master");
+ renderShell("employees","Employee Details","Employees master");
  $("content").innerHTML='<div class="panel">Loading employee details...</div>';
-
  const xs=await getEmployeesOfflineFirst();
  const typeKey=x=>String(x?.employeeType||"").trim().toLowerCase().replace(/[ _-]+/g,"");
  const groups=[
@@ -416,11 +389,6 @@ async function employeesPage(){
    </div>`;
  }).join("")||'<div class="emp-empty">No employees in this section.</div>';
  $("content").innerHTML=`<h1 class="page-title">Employee Details</h1>
- <div class="panel" style="margin-bottom:14px">
-   <h3 style="margin:0 0 6px">My Employee Details</h3>
-   <p style="margin:0 0 10px;color:#536b84;font-size:13px">You can change only your own employee details. Other employees cannot be edited by you.</p>
-   <button class="primary" onclick="profileReturnPage='employees';openProfile(false)">Edit My Details</button>
- </div>
  <style>
  .emp-section{margin-bottom:18px;border-radius:10px;overflow:hidden;border:1px solid #d7e1ec;background:#fff;box-shadow:0 2px 8px rgba(0,0,0,.05)}
  .emp-section-head{padding:11px 16px;font-size:14px;font-weight:800;display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid #dbe5ef}
@@ -510,16 +478,23 @@ function saveReportPdf(){
  window.addEventListener("afterprint",restoreTitle,{once:true});
  window.print();
 }
-function aboutPage(){renderShell("about","About","BSL (HRCF) - SANRAKSH");$("content").innerHTML=`<div class="about-card about-exact">
-<h1>BSL (HRCF) SANRAKSH Maintenance Portal</h1>
-<div class="about-version">Version 1.0.0 | Enterprise Edition</div>
-<div class="about-grid">
-<div class="about-box"><h3>◉ Purpose</h3><p>A digitized, localized web platform designed exclusively for the Bokaro Steel Plant (BSL) HRCF department to track maintenance logs, monitor shift crews, and generate daily reports without relying on manual paperwork.</p></div>
-<div class="about-box"><h3>⚙ Key Features</h3><ul><li>Real-time Shift Status &amp; Tracking</li><li>Secure Login with Strike-Lockout</li><li>Live Google Sheets Database Integration</li><li>One-click A4 Printable Reports</li></ul></div>
-</div>
-<div class="about-developer">&lt;/&gt; <b>Developed &amp; Architected by Sunil Kumar Parida | Junior Engineer | HRCF Department</b><br>Steel Authority of India Limited (SAIL), Bokaro Steel Plant (BSL)<br><span class="about-contact">Mobile: 7979835047</span> | <span class="about-contact">Email: sunilkumarparida.sail@gmail.com</span></div>
-<div class="about-feedback">Feel free to give your valuable feedback and suggestions to improve this website.</div>
-</div>`}
+function aboutPage(){
+ renderShell("about","About","BSL (HRCF) - SANRAKSH");
+ $("content").innerHTML=`<div class="about-card">
+ <h1 style="text-align:center;color:#075fc5;margin:0 0 3px">BSL (HRCF) SANRAKSH Maintenance Portal</h1>
+ <h3 style="text-align:center;margin:0 0 24px">Version 1.0.0 | Enterprise Edition</h3>
+ <div class="about-two-col">
+   <div class="about-panel"><h2>◉ Purpose</h2><hr><p>A digitized, localized web platform designed exclusively for the Bokaro Steel Plant (BSL) HRCF department to track maintenance logs, monitor shift crews, and generate daily reports without relying on manual paperwork.</p></div>
+   <div class="about-panel"><h2>⚙ Key Features</h2><hr><ul><li>Real-time Shift Status & Tracking</li><li>Secure Login with Strike-Lockout</li><li>Live Google Sheets Database Integration</li><li>One-click A4 Printable Reports</li></ul></div>
+ </div>
+ <div class="developer-box">
+   <p>&lt;/&gt; Developed &amp; Architected by Sunil Kumar Parida | Junior Engineer | HRCF Department</p>
+   <p>Steel Authority of India Limited (SAIL), Bokaro Steel Plant (BSL)</p>
+   <p>Mobile: 7979835047 | Email: sunilkumarparida.sail@gmail.com</p>
+ </div>
+ <p style="text-align:center;font-weight:700;margin:18px 0 0">Feel free to give your valuable feedback and suggestions to improve this website.</p>
+ </div>`;
+}
 async function syncPage(){
  renderShell("sync","Sync Data","Offline records");
  const n=await updateSyncBadge();
@@ -532,46 +507,35 @@ async function manualSync(){
  else alert("No pending records.");
 }
 
-async function restoreSessionOnStartup(){
- const stored=loadStoredSession();
- if(!stored){showScreen("loginScreen");return;}
- session=stored;
- let last=0;try{last=Number(localStorage.getItem(ACTIVITY_STORAGE_KEY)||0)}catch(e){}
- if(!last||Date.now()-last>=IDLE_TIMEOUT_MS){clearSessionState();showScreen("loginScreen");return;}
- scheduleIdleLogout();
- await routeAfterLogin();
-}
-
-const THEME_STORAGE_KEY="sanrakshTheme";
-function applyTheme(theme){
- const t=theme==="dark"?"dark":"light";
- document.documentElement.setAttribute("data-theme",t);
- try{localStorage.setItem(THEME_STORAGE_KEY,t)}catch(e){}
- const b=$("themeToggle");
- if(b){b.textContent=t==="dark"?"☀":"☾";b.title=t==="dark"?"Switch to White Mode":"Switch to Dark Mode";b.setAttribute("aria-label",b.title)}
-}
-function initTheme(){
- let t="light";
- try{t=localStorage.getItem(THEME_STORAGE_KEY)||"light"}catch(e){}
- applyTheme(t);
- if(!$("themeToggle")){
-   const b=document.createElement("button");
-   b.id="themeToggle";b.className="theme-toggle";b.type="button";
-   b.onclick=()=>applyTheme(document.documentElement.getAttribute("data-theme")==="dark"?"light":"dark");
-   const top=$("topUser");
-   if(top&&top.parentNode)top.parentNode.insertBefore(b,top);
- }
- applyTheme(t);
-}
-
 document.addEventListener("DOMContentLoaded",()=>{
- initTheme();
+  const themeToggle=$("themeToggle");
+  const applyTheme=()=>{
+    const dark=localStorage.getItem("sanraksh-theme")==="dark";
+    document.body.classList.toggle("dark-mode",dark);
+    if(themeToggle){themeToggle.textContent=dark?"☀":"☾";themeToggle.title=dark?"Switch to white mode":"Switch to dark mode";}
+  };
+  applyTheme();
+  if(themeToggle) themeToggle.onclick=()=>{
+    localStorage.setItem("sanraksh-theme",document.body.classList.contains("dark-mode")?"light":"dark");
+    applyTheme();
+  };
+
  $("loginForm").onsubmit=e=>{e.preventDefault();login()};$("togglePassword").onclick=toggleEye;
+
  const rememberOffline=$("rememberOffline");
- if(rememberOffline){getOfflineAuth().then(saved=>{rememberOffline.checked=!!saved}).catch(()=>{});rememberOffline.addEventListener("change",async()=>{if(!rememberOffline.checked)await clearOfflineAuth()});}
- $("newUserBtn").onclick=newUser;$("forgotBtn").onclick=forgot;$("resetBtn").onclick=resetPassword;$("forgotBack").onclick=()=>showScreen("loginScreen");$("setupBack").onclick=()=>showScreen("loginScreen");$("setupPass").oninput=passwordRules;$("createPasswordBtn").onclick=createPassword;$("profileType").onchange=loadDesignations;$("saveProfileBtn").onclick=saveProfile;$("profileHomeBtn").onclick=continueHome;$("logoutBtn").onclick=logout;$("menuBtn").onclick=()=>$("sidebar").classList.toggle("open");document.querySelectorAll("#nav button").forEach(b=>b.onclick=()=>openPage(b.dataset.page));
- bindActivityTracking();
+ if(rememberOffline){
+   getOfflineAuth().then(saved=>{
+     rememberOffline.checked=!!saved;
+   }).catch(()=>{});
+
+   rememberOffline.addEventListener("change",async()=>{
+     if(!rememberOffline.checked){
+       await clearOfflineAuth();
+     }
+   });
+ }$("newUserBtn").onclick=newUser;$("forgotBtn").onclick=forgot;$("resetBtn").onclick=resetPassword;$("forgotBack").onclick=()=>showScreen("loginScreen");$("setupBack").onclick=()=>showScreen("loginScreen");$("setupPass").oninput=passwordRules;$("createPasswordBtn").onclick=createPassword;$("profileType").onchange=loadDesignations;$("saveProfileBtn").onclick=saveProfile;$("profileHomeBtn").onclick=continueHome;$("logoutBtn").onclick=logout;$("menuBtn").onclick=()=>$("sidebar").classList.toggle("open");document.querySelectorAll("#nav button").forEach(b=>b.onclick=()=>openPage(b.dataset.page));
  openOfflineDb().then(()=>{updateSyncBadge();if(navigator.onLine)setTimeout(syncPending,700)}).catch(()=>{});
- restoreSessionOnStartup().catch(()=>showScreen("loginScreen"));
+ showScreen("loginScreen");
+ if(session&&navigator.onLine)setTimeout(preloadOfflineData,500);
 });
 if("serviceWorker"in navigator)navigator.serviceWorker.register("./sw.js").catch(()=>{});
