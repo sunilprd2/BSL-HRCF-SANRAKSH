@@ -205,7 +205,7 @@ async function login(){
 }
 function openPasswordSetup(staff){$("setupStaff").value=staff;showScreen("setupScreen");$("setupPass").value="";$("setupConfirm").value="";passwordRules()}
 function passwordRules(){const p=$("setupPass").value;const tests=[["r1",p.length>=8,"Minimum 8 characters"],["r2",/[A-Z]/.test(p),"One capital letter"],["r3",/[a-z]/.test(p),"One small letter"],["r4",/[0-9]/.test(p),"One number"],["r5",/[^A-Za-z0-9]/.test(p),"One special character"]];tests.forEach(t=>{$(t[0]).textContent=(t[1]?"✓ ":"✗ ")+t[2];$(t[0]).className=t[1]?"good":""})}
-async function createPassword(){const s=$("setupStaff").value.trim(),p=$("setupPass").value,c=$("setupConfirm").value;if(p!==c){setMessage("setupMsg","Passwords do not match.");return}try{const r=await api("setFirstPassword",{staffNo:s,password:p});if(!r.success){setMessage("setupMsg",r.message);return}const l=await api("login",{staffNo:s,password:p});session=l;localStorage.setItem("sanrakshSession",JSON.stringify(l));await openProfile(true)}catch(e){setMessage("setupMsg","Connection error.")}}
+async function createPassword(){const s=$("setupStaff").value.trim(),p=$("setupPass").value,c=$("setupConfirm").value;if(p!==c){setMessage("setupMsg","Passwords do not match.");return}try{const r=await api("setFirstPassword",{staffNo:s,password:p});if(!r.success){setMessage("setupMsg",r.message);return}const l=await api("login",{staffNo:s,password:p});session=l;localStorage.setItem("sanrakshSession",JSON.stringify(l));localStorage.setItem("sanrakshLastActivity",String(Date.now()));startIdleMonitor();await openProfile(true)}catch(e){setMessage("setupMsg","Connection error.")}}
 async function newUser(){const s=prompt("Enter your 6 digit Staff No:");if(!s)return;if(!/^\d{6}$/.test(s)){alert("Staff No must be exactly 6 digits.");return}try{const r=await api("newUser",{staffNo:s});if(!r.success){alert(r.message||"Staff No not available.");return}$("loginStaffNo").value=s;$("loginPassword").value="";openPasswordSetup(s)}catch(e){alert("Connection error.")}}
 async function forgot(){showScreen("forgotScreen");$("forgotStaff").value=$("loginStaffNo").value}
 async function resetPassword(){const s=$("forgotStaff").value.trim();try{const r=await api("requestPasswordReset",{staffNo:s});setMessage("forgotMsg",r.message||"Request submitted.",!!r.success)}catch(e){setMessage("forgotMsg","Connection error.")}}
@@ -216,7 +216,7 @@ async function openProfile(afterLogin=false, returnPage=null){
   setMessage("profileMsg","Loading saved details...",true);
   try{
     const p=await api("profile",{staffNo:session.staffNo},"GET");
-    cachedProfile=p||{};
+    cachedProfile=p||{}; const complete=!!(p&&p.department&&p.mobile&&p.employeeType&&p.designation); if(afterLogin&&complete){localStorage.setItem("sanrakshLastPage","home");home();return;} showScreen("profileScreen");
     $("profileName").value=p.name||session.name||"";
     $("profileEmail").value=p.email||session.email||"";
     const ds=p.department||"",ty=p.employeeType||"",dg=p.designation||"",mob=p.mobile||"";
@@ -246,7 +246,7 @@ async function openProfile(afterLogin=false, returnPage=null){
 function loadDesignations(){const t=$("profileType").value;const d={Executive:["Assistant Manager","Manager","Senior Manager","Assistant General Manager (AGM)","Deputy General Manager (DGM)"],"Non-Executive":["Jr. Engineer","Engineering Associate","Jr. Engineering Associate","Technical Associate"],"Contract Worker":["Contract Worker"]}[t]||[];$("profileDesignation").innerHTML='<option value="">Select Designation</option>'+d.map(x=>`<option>${esc(x)}</option>`).join("")}
 async function saveProfile(){const details={staffNo:session.staffNo,sessionToken:session.sessionToken,name:$("profileName").value,department:$("profileDepartment").value,mobile:$("profileMobile").value.trim(),employeeType:$("profileType").value,designation:$("profileDesignation").value,email:$("profileEmail").value};if(!details.department||!/^\d{10}$/.test(details.mobile)||!details.employeeType||!details.designation){setMessage("profileMsg","Please complete all employee details correctly.");return}try{const r=await api("saveProfile",{details});if(!r.success){setMessage("profileMsg",r.message);return}cachedProfile=r;session={...session,name:r.name,department:r.department,mobile:r.mobile,employeeType:r.employeeType,designation:r.designation};localStorage.setItem("sanrakshSession",JSON.stringify(session));setMessage("profileMsg","Employee details saved successfully.",true);$("profileHomeBtn").disabled=false;const back=window.__profileReturnPage;window.__profileReturnPage=null;setTimeout(()=>back?openPage(back):home(),500)}catch(e){setMessage("profileMsg","Connection error.")}}
 function continueHome(){window.__profileReturnPage=null;home()}
-function logout(auto=false){clearTimeout(idleTimer);localStorage.removeItem("sanrakshSession");localStorage.removeItem("sanrakshLastPage");localStorage.removeItem("sanrakshLastActivity");session=null;location.reload()}
+function logout(auto=false){clearTimeout(idleTimer);clearInterval(idleCheckTimer);localStorage.removeItem("sanrakshSession");localStorage.removeItem("sanrakshLastPage");localStorage.removeItem("sanrakshLastActivity");session=null;location.reload()}
 
 function statusPill(s){const c=String(s||"").toLowerCase();return `<span class="status-pill ${c}">${esc(s||"")}</span>`}
 function renderShell(page,title,sub=""){localStorage.setItem("sanrakshLastPage",page);touchActivity();showScreen("appScreen");document.querySelectorAll("#nav button").forEach(b=>b.classList.toggle("active",b.dataset.page===page));$("topTitle").innerHTML=`${esc(title)}<br><small>${esc(sub)}</small>`;$("topUser").textContent=session?.name||session?.staffNo||"●"}
@@ -506,12 +506,14 @@ async function manualSync(){
  else alert("No pending records.");
 }
 
-const IDLE_LIMIT=10*60*1000; let idleTimer=null;
-function touchActivity(){if(!session)return;const now=Date.now();localStorage.setItem("sanrakshLastActivity",String(now));clearTimeout(idleTimer);idleTimer=setTimeout(()=>{if(Date.now()-Number(localStorage.getItem("sanrakshLastActivity")||0)>=IDLE_LIMIT)logout(true)},IDLE_LIMIT+500)}
-["click","touchstart","keydown","scroll","pointerdown"].forEach(ev=>window.addEventListener(ev,()=>touchActivity(),{passive:true}));
-function restoreSession(){try{const raw=localStorage.getItem("sanrakshSession");if(!raw)return null;const x=JSON.parse(raw);if(!x?.staffNo)return null;const last=Number(localStorage.getItem("sanrakshLastActivity")||0);if(last && Date.now()-last>=IDLE_LIMIT){localStorage.removeItem("sanrakshSession");return null}session=x;touchActivity();return x}catch(e){return null}}
-
-document.addEventListener("DOMContentLoaded",()=>{
+const IDLE_LIMIT=10*60*1000; let idleTimer=null; let idleCheckTimer=null;
+function touchActivity(){if(!session)return;localStorage.setItem("sanrakshLastActivity",String(Date.now()));scheduleIdleCheck()}
+function scheduleIdleCheck(){clearTimeout(idleTimer);if(!session)return;const last=Number(localStorage.getItem("sanrakshLastActivity")||Date.now());idleTimer=setTimeout(checkIdleTimeout,Math.max(1000,IDLE_LIMIT-(Date.now()-last)+250))}
+function checkIdleTimeout(){if(!session)return;const last=Number(localStorage.getItem("sanrakshLastActivity")||Date.now());if(Date.now()-last>=IDLE_LIMIT){logout(true);return}scheduleIdleCheck()}
+function startIdleMonitor(){clearInterval(idleCheckTimer);scheduleIdleCheck();idleCheckTimer=setInterval(checkIdleTimeout,5000)}
+["click","touchstart","keydown","scroll","pointerdown","mousemove"].forEach(ev=>window.addEventListener(ev,()=>touchActivity(),{passive:true}));
+document.addEventListener("visibilitychange",()=>{if(session&&document.visibilityState==="visible")checkIdleTimeout()});
+function restoreSession(){try{const raw=localStorage.getItem("sanrakshSession");if(!raw)return null;const x=JSON.parse(raw);if(!x?.staffNo)return null;const last=Number(localStorage.getItem("sanrakshLastActivity")||0);if(last&&Date.now()-last>=IDLE_LIMIT){localStorage.removeItem("sanrakshSession");return null}session=x;startIdleMonitor();return x}catch(e){return null}}  document.addEventListener("DOMContentLoaded",()=>{
   const themeToggle=$("themeToggle");
   const applyTheme=()=>{
     const dark=localStorage.getItem("sanraksh-theme")==="dark";
