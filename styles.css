@@ -87,3 +87,31 @@ body.dark .about-grid h3{border-color:#52657f}
 body.dark .about-developer{background:#214f7e;color:#fff}
 body.dark .about-feedback{color:#f8fafc}
 @media(max-width:650px){.about-grid{grid-template-columns:1fr}.my-details-bar{flex-direction:column;align-items:stretch}}
+
+/* ===== FINAL DARK MODE ABOUT TEXT VISIBILITY FIX ONLY ===== */
+body.dark .about-grid section p,
+body.dark .about-grid section li{
+  color:#172033;
+}
+body.dark-mode .about-grid section p,
+body.dark-mode .about-grid section li{
+  color:#172033;
+}
+
+/* ===== DARK MODE LIGHT-CARD TEXT VISIBILITY - ONLY ADDITION ===== */
+body.dark .current-grid div,
+body.dark-mode .current-grid div{
+  color:#17324d !important;
+}
+body.dark .current-grid div b,
+body.dark .current-grid div span,
+body.dark-mode .current-grid div b,
+body.dark-mode .current-grid div span{
+  color:#17324d !important;
+}
+body.dark .about-grid section p,
+body.dark .about-grid section li,
+body.dark-mode .about-grid section p,
+body.dark-mode .about-grid section li{
+  color:#172033 !important;
+}
