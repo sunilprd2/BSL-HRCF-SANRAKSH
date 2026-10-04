@@ -14,3 +14,44 @@ label{display:block;text-align:left;font-size:13px;font-weight:700;margin:11px 0
 
 .great-place-img{width:120px;height:auto;object-fit:contain;filter:drop-shadow(0 2px 4px #0004)}
 .login-top{align-items:flex-start}
+
+
+/* ===== SANRAKSH V9 THEME ===== */
+.theme-toggle{margin-left:10px;border:1px solid #ffffff55;background:#ffffff18;color:#fff;width:38px;height:34px;border-radius:8px;font-size:19px;display:inline-flex;align-items:center;justify-content:center;cursor:pointer}
+[data-theme="dark"]{--bg:#0f172a;--text:#e5edf7;--muted:#94a3b8}
+[data-theme="dark"] body{background:#0f172a;color:#e5edf7}
+[data-theme="dark"] .sidebar{background:#111827;border-color:#263449}
+[data-theme="dark"] .sidebar-brand{border-color:#263449}
+[data-theme="dark"] .sidebar-brand strong{color:#8fc1ff}
+[data-theme="dark"] #nav button{background:#111827;color:#dbe7f5}
+[data-theme="dark"] #nav button:hover,[data-theme="dark"] #nav button.active{background:#17345b;color:#78b5ff}
+[data-theme="dark"] .main{background:#0f172a}
+[data-theme="dark"] .current-card,[data-theme="dark"] .panel,[data-theme="dark"] .about-card{background:#172033;border-color:#2b3a50;color:#e5edf7}
+[data-theme="dark"] .current-grid div{background:#202c40}
+[data-theme="dark"] input,[data-theme="dark"] select,[data-theme="dark"] textarea{background:#111827;color:#e5edf7;border-color:#3b4a61}
+[data-theme="dark"] input:focus,[data-theme="dark"] select:focus,[data-theme="dark"] textarea:focus{border-color:#4f9cff}
+[data-theme="dark"] .data-table th{background:#202c40;color:#d9e9ff}
+[data-theme="dark"] .data-table td{border-color:#2b3a50}
+[data-theme="dark"] .report-time div{background:#111827;border-color:#3b4a61}
+[data-theme="dark"] .setup-screen{background:#0f172a}
+[data-theme="dark"] .setup-card{background:#172033;border-color:#2b3a50;color:#e5edf7}
+[data-theme="dark"] .setup-heading{color:#8fc1ff;border-color:#334155}
+[data-theme="dark"] .setup-sub{color:#a7b5c8}
+[data-theme="dark"] .rules{background:#202c40;border-color:#334155}
+[data-theme="dark"] .profile-setup input[readonly]{background:#202c40;color:#cbd5e1}
+[data-theme="dark"] .about-box{background:#202c40;border-color:#334155}
+[data-theme="dark"] .about-developer{background:#1d4f82}
+[data-theme="dark"] .about-feedback{color:#dbe7f5}
+.about-exact{text-align:center;padding:28px}
+.about-exact>img{margin-bottom:5px}
+.about-exact h1{color:#075fc5;margin:0 0 4px;font-size:27px}
+.about-version{font-weight:700;margin-bottom:25px}
+.about-grid{display:grid;grid-template-columns:1fr 1fr;gap:20px;text-align:left}
+.about-box{border:1px solid #dce4ee;background:#f8fafc;border-radius:8px;padding:20px;min-height:190px}
+.about-box h3{margin:0 0 12px;padding-bottom:10px;border-bottom:2px solid #d1d5db}
+.about-box p{font-size:17px;line-height:1.75;margin:0}
+.about-box li{margin:8px 0}
+.about-developer{margin-top:28px;background:#d9ecff;color:#07509b;border-radius:8px;padding:18px;font-size:15px;line-height:1.8;font-weight:600}
+.about-feedback{margin-top:17px;font-size:16px;font-weight:600;color:#34516d}
+.about-contact{pointer-events:none;user-select:text}
+@media(max-width:800px){.about-grid{grid-template-columns:1fr}.about-exact{padding:18px}.about-exact h1{font-size:22px}.about-box p{font-size:15px}.about-developer{font-size:13px}}

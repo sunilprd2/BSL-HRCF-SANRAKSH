@@ -510,7 +510,16 @@ function saveReportPdf(){
  window.addEventListener("afterprint",restoreTitle,{once:true});
  window.print();
 }
-function aboutPage(){renderShell("about","About","BSL (HRCF) - SANRAKSH");$("content").innerHTML='<div class="about-card"><img src="sanraksh-icon.png"><h2>BSL (HRCF) - SANRAKSH Maintenance Log System</h2><p>Digital maintenance log, shift crew, employee and daily report platform for HRCF.</p><p><b>Developed & Architected by</b><br>Sunil Kumar Parida<br>Junior Engineer | HRCF<br>SAIL / Bokaro Steel Plant (BSL)</p><p><b>Phone:</b> <a href="tel:7979835047">7979835047</a></p><p><b>Email:</b> <a href="mailto:sunilkumarparida.sail@gmail.com">sunilkumarparida.sail@gmail.com</a></p><p>Fill free to give your valuble feedback and suggection to imptove this website</p></div>'}
+function aboutPage(){renderShell("about","About","BSL (HRCF) - SANRAKSH");$("content").innerHTML=`<div class="about-card about-exact">
+<h1>BSL (HRCF) SANRAKSH Maintenance Portal</h1>
+<div class="about-version">Version 1.0.0 | Enterprise Edition</div>
+<div class="about-grid">
+<div class="about-box"><h3>◉ Purpose</h3><p>A digitized, localized web platform designed exclusively for the Bokaro Steel Plant (BSL) HRCF department to track maintenance logs, monitor shift crews, and generate daily reports without relying on manual paperwork.</p></div>
+<div class="about-box"><h3>⚙ Key Features</h3><ul><li>Real-time Shift Status &amp; Tracking</li><li>Secure Login with Strike-Lockout</li><li>Live Google Sheets Database Integration</li><li>One-click A4 Printable Reports</li></ul></div>
+</div>
+<div class="about-developer">&lt;/&gt; <b>Developed &amp; Architected by Sunil Kumar Parida | Junior Engineer | HRCF Department</b><br>Steel Authority of India Limited (SAIL), Bokaro Steel Plant (BSL)<br><span class="about-contact">Mobile: 7979835047</span> | <span class="about-contact">Email: sunilkumarparida.sail@gmail.com</span></div>
+<div class="about-feedback">Feel free to give your valuable feedback and suggestions to improve this website.</div>
+</div>`}
 async function syncPage(){
  renderShell("sync","Sync Data","Offline records");
  const n=await updateSyncBadge();
@@ -532,7 +541,31 @@ async function restoreSessionOnStartup(){
  scheduleIdleLogout();
  await routeAfterLogin();
 }
+
+const THEME_STORAGE_KEY="sanrakshTheme";
+function applyTheme(theme){
+ const t=theme==="dark"?"dark":"light";
+ document.documentElement.setAttribute("data-theme",t);
+ try{localStorage.setItem(THEME_STORAGE_KEY,t)}catch(e){}
+ const b=$("themeToggle");
+ if(b){b.textContent=t==="dark"?"☀":"☾";b.title=t==="dark"?"Switch to White Mode":"Switch to Dark Mode";b.setAttribute("aria-label",b.title)}
+}
+function initTheme(){
+ let t="light";
+ try{t=localStorage.getItem(THEME_STORAGE_KEY)||"light"}catch(e){}
+ applyTheme(t);
+ if(!$("themeToggle")){
+   const b=document.createElement("button");
+   b.id="themeToggle";b.className="theme-toggle";b.type="button";
+   b.onclick=()=>applyTheme(document.documentElement.getAttribute("data-theme")==="dark"?"light":"dark");
+   const top=$("topUser");
+   if(top&&top.parentNode)top.parentNode.insertBefore(b,top);
+ }
+ applyTheme(t);
+}
+
 document.addEventListener("DOMContentLoaded",()=>{
+ initTheme();
  $("loginForm").onsubmit=e=>{e.preventDefault();login()};$("togglePassword").onclick=toggleEye;
  const rememberOffline=$("rememberOffline");
  if(rememberOffline){getOfflineAuth().then(saved=>{rememberOffline.checked=!!saved}).catch(()=>{});rememberOffline.addEventListener("change",async()=>{if(!rememberOffline.checked)await clearOfflineAuth()});}

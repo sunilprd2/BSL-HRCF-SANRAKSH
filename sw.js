@@ -1,4 +1,4 @@
-const CACHE = "sanraksh-v8";
+const CACHE = "sanraksh-v9";
 const ASSETS = [
   "./",
   "./index.html",
