@@ -5,7 +5,6 @@ const today=()=>new Date().toISOString().slice(0,10);
 const shifts=[{name:"A Shift",start:"06:00",end:"14:00",cls:"a"},{name:"B Shift",start:"14:00",end:"22:00",cls:"b"},{name:"C Shift",start:"22:00",end:"06:00",cls:"c"}];
 let session=null,employees=[],areas=[],equipment=[],pending=[];
 let cachedProfile=null;
-let pageHistory=[];
 let currentPage="";
 
 /* =========================================================
@@ -280,19 +279,9 @@ function home(){
   <div class="quick-grid"><button class="q-blue" onclick="openPage('addLog')"><span class="quick-icon"><svg viewBox="0 0 64 64" aria-hidden="true"><path fill="#fff" d="M13 7h29l12 12v38H13z"/><path fill="#1685ff" d="M40 7v15h14z"/><path fill="#1685ff" d="M22 27h19v4H22zm0 9h19v4H22zm0 9h12v4H22z"/><circle cx="48" cy="46" r="12" fill="#20d447"/><path fill="#fff" d="M46 39h4v5h5v4h-5v5h-4v-5h-5v-4h5z"/></svg></span><span>Add Log</span></button><button class="q-green" onclick="openPage('logs')"><span class="quick-icon"><svg viewBox="0 0 64 64" aria-hidden="true"><path fill="#fff" d="M11 7h34l9 9v41H11z"/><path fill="#1787ff" d="M43 7v12h11z"/><rect x="19" y="25" width="7" height="7" rx="2" fill="#1685ff"/><rect x="30" y="26" width="17" height="4" rx="2" fill="#1b4e91"/><rect x="19" y="36" width="7" height="7" rx="2" fill="#20d447"/><rect x="30" y="37" width="17" height="4" rx="2" fill="#1b4e91"/><rect x="19" y="47" width="7" height="7" rx="2" fill="#ffc21a"/><rect x="30" y="48" width="17" height="4" rx="2" fill="#1b4e91"/></svg></span><span>View Logs</span></button><button class="q-orange" onclick="openPage('reports')"><span class="quick-icon"><svg viewBox="0 0 64 64" aria-hidden="true"><path fill="#fff" d="M10 7h34l10 10v40H10z"/><path fill="#1685ff" d="M43 7v13h11z"/><rect x="18" y="40" width="7" height="12" rx="2" fill="#1685ff"/><rect x="29" y="33" width="7" height="19" rx="2" fill="#20d447"/><rect x="40" y="25" width="7" height="27" rx="2" fill="#ff3030"/><path stroke="#17406b" stroke-width="4" d="M17 55h32"/></svg></span><span>Reports</span></button><button class="q-purple" onclick="openPage('employees')"><span class="quick-icon"><svg viewBox="0 0 64 64" aria-hidden="true"><circle cx="32" cy="17" r="9" fill="#ffd6b0"/><path fill="#ffb21a" d="M20 15q2-12 12-12t12 12H20z"/><path fill="#1685ff" d="M16 58q2-18 16-18t16 18z"/><path fill="#0874df" d="M24 40h16v8H24z"/><path fill="#fff" d="M38 47h10v5H38z"/></svg></span><span>Employee Details</span></button><button class="q-cyan" onclick="openPage('shifts')"><span class="quick-icon"><svg viewBox="0 0 64 64" aria-hidden="true"><rect x="10" y="10" width="42" height="45" rx="6" fill="#fff"/><path fill="#ff3b30" d="M10 16a6 6 0 0 1 6-6h30a6 6 0 0 1 6 6v8H10z"/><path fill="#1685ff" d="M18 4h5v12h-5zm23 0h5v12h-5z"/><rect x="18" y="29" width="7" height="7" rx="2" fill="#20d447"/><rect x="29" y="29" width="7" height="7" rx="2" fill="#ffc21a"/><rect x="40" y="29" width="7" height="7" rx="2" fill="#19b9d0"/><circle cx="45" cy="47" r="12" fill="#1685ff"/><circle cx="45" cy="47" r="7" fill="#fff"/><path stroke="#ff3030" stroke-width="3" d="M45 47v-5m0 5 4 3"/></svg></span><span>Shift Details</span></button><button class="q-info" onclick="openPage('about')"><span class="quick-icon"><svg viewBox="0 0 64 64" aria-hidden="true"><circle cx="32" cy="32" r="25" fill="#1685ff"/><circle cx="32" cy="32" r="21" fill="#0d6ee8"/><circle cx="32" cy="20" r="4.5" fill="#fff"/><rect x="28" y="27" width="8" height="22" rx="4" fill="#fff"/></svg></span><span>About</span></button><button class="q-sync" onclick="openPage('sync')"><span class="quick-icon"><svg viewBox="0 0 64 64" aria-hidden="true"><path fill="#fff" d="M17 45a13 13 0 0 1 1-26 17 17 0 0 1 32 5 11 11 0 0 1-1 22z"/><path fill="none" stroke="#20d447" stroke-width="7" stroke-linecap="round" d="M22 37a15 15 0 0 0 25 1"/><path fill="none" stroke="#1685ff" stroke-width="7" stroke-linecap="round" d="M42 27a15 15 0 0 0-25-1"/><path fill="#20d447" d="m45 31 9 5-10 5z"/><path fill="#1685ff" d="m19 33-9-5 10-5z"/></svg></span><span>Sync Data</span></button></div>`;;
  }).catch(()=>{$("content").innerHTML='<div class="panel">Unable to load dashboard.</div>'})
 }
-function openPage(p,fromBack=false){
- const cur=localStorage.getItem("sanrakshLastPage")||currentPage||"home";
- if(!fromBack && cur!==p && cur!=="profile"){
-   pageHistory=pageHistory.filter(x=>x!==p);
-   pageHistory.push(cur);
- }
+function openPage(p){
  if(p==="home")home();else if(p==="addLog")addLogPage();else if(p==="logs")logsPage();else if(p==="employees")employeesPage();else if(p==="shifts")shiftDetailsPage();else if(p==="reports")reportsPage();else if(p==="about")aboutPage();else if(p==="sync")syncPage();
  $("sidebar").classList.remove("open");
-}
-
-function goBackTab(){
- const prev=pageHistory.pop()||"home";
- openPage(prev,true);
 }
 
 async function shiftDetailsPage(forceShift=""){
@@ -475,22 +464,47 @@ async function loadReport(){
  const safeDate=d?d.split("-").reverse().join("/"):today().split("-").reverse().join("/");
  document.getElementById("reportPrintStyle")?.remove();
  const ps=document.createElement("style");ps.id="reportPrintStyle";
- ps.textContent=`@media print{
-  @page{size:A4 portrait;margin:8mm}
-  body{font-size:11px!important;background:#fff!important}
-  .sidebar,.topbar,#nav,.report-filter,.report-actions,.page-title,.menu-btn{display:none!important}
-  .main{margin:0!important;width:100%!important}
-  .content{padding:0!important}
-  .report-page{border:1px solid #bbb!important;box-shadow:none!important;margin:0!important;padding:5mm!important}
-  .report-title{font-size:18px!important;margin:2px 0 10px!important}
-  .report-meta td{font-size:11px!important;padding:7px!important}
-  .report-stats{display:grid!important;grid-template-columns:repeat(4,1fr)!important;gap:7px!important;margin:9px 0!important}.report-stat{font-size:11px!important;padding:7px!important;min-width:0!important}
-  .report-stat strong{font-size:16px!important}
+ ps.textContent=`
+  /* Report layout: boxed cells and clear separator lines (screen + print) */
+  .report-page{background:#fff!important;border:1px solid #cbd5e1!important;border-radius:0!important;box-shadow:none!important;padding:14px!important}
+  .report-title{text-align:center!important;color:#123b68!important;font-size:22px!important;font-weight:800!important;margin:4px 0 16px!important}
+  .report-meta{width:100%!important;border-collapse:collapse!important;table-layout:fixed!important;background:#fff!important}
+  .report-meta td{border:1px solid #cbd5e1!important;padding:12px!important;vertical-align:middle!important;font-size:13px!important;color:#123b68!important;background:#fff!important}
+  .report-meta td b{font-weight:800!important;color:#123b68!important}
+  .coil-input{width:100%!important;box-sizing:border-box!important;border:1px solid #b9c7d8!important;border-radius:4px!important;background:#fff!important;color:#123b68!important;padding:6px 8px!important;font-size:13px!important}
+  .report-stats{display:grid!important;grid-template-columns:repeat(4,1fr)!important;gap:0!important;margin:14px 0!important;border-left:1px solid #cbd5e1!important}
+  .report-stat{border:1px solid #cbd5e1!important;border-left:0!important;background:#fff!important;color:#345!important;text-align:center!important;padding:12px 8px!important;font-size:13px!important}
+  .report-stat strong{display:block!important;font-size:22px!important;margin-top:5px!important;color:#111827!important}
   .report-table{width:100%!important;table-layout:fixed!important;border-collapse:collapse!important;font-size:13px!important}
-  .report-table th,.report-table td{font-size:13px!important;padding:8px 7px!important;line-height:1.4!important;word-break:break-word!important;white-space:normal!important;border:1px solid #aaa!important}
+  .report-table th,.report-table td{font-size:13px!important;padding:8px 7px!important;line-height:1.4!important;word-break:break-word!important;white-space:normal!important;border:1px solid #cbd5e1!important}
+  .report-table th{background:#f1f5f9!important;color:#123b68!important;font-weight:800!important}
   .report-table th:nth-child(1){width:12%}.report-table th:nth-child(2){width:10%}.report-table th:nth-child(3){width:13%}.report-table th:nth-child(4){width:14%}.report-table th:nth-child(5){width:18%}.report-table th:nth-child(6){width:20%}.report-table th:nth-child(7){width:13%}
-  .coil-input{border:0!important;background:transparent!important;padding:0!important;font-size:11px!important}
- }`;
+  @media(max-width:800px){
+    .report-page{padding:8px!important}
+    .report-title{font-size:18px!important}
+    .report-meta td{padding:8px!important;font-size:12px!important}
+    .report-meta{font-size:12px!important}
+    .report-stats{grid-template-columns:repeat(2,1fr)!important;border-left:0!important}
+    .report-stat{border-left:1px solid #cbd5e1!important}
+    .report-table{font-size:11px!important;min-width:760px!important}
+    .report-table th,.report-table td{font-size:11px!important}
+  }
+  @media print{
+   @page{size:A4 portrait;margin:8mm}
+   body{font-size:11px!important;background:#fff!important}
+   .sidebar,.topbar,#nav,.report-filter,.report-actions,.page-title,.menu-btn{display:none!important}
+   .main{margin:0!important;width:100%!important}
+   .content{padding:0!important}
+   .report-page{border:1px solid #bbb!important;box-shadow:none!important;margin:0!important;padding:5mm!important}
+   .report-title{font-size:18px!important;margin:2px 0 10px!important}
+   .report-meta td{font-size:11px!important;padding:7px!important}
+   .report-stats{display:grid!important;grid-template-columns:repeat(4,1fr)!important;gap:0!important;margin:9px 0!important}
+   .report-stat{font-size:11px!important;padding:7px!important}
+   .report-stat strong{font-size:16px!important}
+   .report-table{width:100%!important;min-width:0!important}
+   .report-table th,.report-table td{font-size:11px!important;padding:7px 6px!important}
+   .coil-input{border:0!important;background:transparent!important;padding:0!important;font-size:11px!important}
+  }`;
  document.head.appendChild(ps);
  $("reportBox").innerHTML=`<div class="panel report-page">
   <div class="report-actions"><button class="primary" onclick="saveReportPdf()">💾 Save PDF</button></div>
@@ -565,8 +579,7 @@ document.addEventListener("DOMContentLoaded",()=>{
        await clearOfflineAuth();
      }
    });
- }$("newUserBtn").onclick=newUser;$("forgotBtn").onclick=forgot;$("resetBtn").onclick=resetPassword;$("forgotBack").onclick=()=>showScreen("loginScreen");$("setupBack").onclick=()=>showScreen("loginScreen");$("setupPass").oninput=passwordRules;$("createPasswordBtn").onclick=createPassword;$("profileType").onchange=loadDesignations;$("saveProfileBtn").onclick=saveProfile;$("profileHomeBtn").onclick=continueHome;$("logoutBtn").onclick=logout;$("menuBtn").onclick=()=>$("sidebar").classList.toggle("open");document.querySelectorAll("#nav button").forEach(b=>b.onclick=()=>openPage(b.dataset.page));
- $("backTabBtn").onclick=goBackTab;
+ }$("newUserBtn").onclick=newUser;$("forgotBtn").onclick=forgot;$("resetBtn").onclick=resetPassword;$("forgotBack").onclick=()=>showScreen("loginScreen");$("setupBack").onclick=()=>showScreen("loginScreen");$("setupPass").oninput=passwordRules;$("createPasswordBtn").onclick=createPassword;$("profileType").onchange=loadDesignations;$("saveProfileBtn").onclick=saveProfile;$("profileHomeBtn").onclick=continueHome;$("logoutBtn").onclick=logout;$("menuBtn").onclick=()=>$("sidebar").classList.toggle("open");$("sidebarCloseBtn").onclick=()=>$("sidebar").classList.remove("open");document.querySelectorAll("#nav button").forEach(b=>b.onclick=()=>openPage(b.dataset.page));
  openOfflineDb().then(()=>{updateSyncBadge();if(navigator.onLine)setTimeout(syncPending,700)}).catch(()=>{});
  const restored=restoreSession();
  if(restored){ if(restored.department&&restored.mobile&&restored.employeeType&&restored.designation){ const p=localStorage.getItem("sanrakshLastPage")||"home"; setTimeout(()=>openPage(p),0); } else { setTimeout(()=>openProfile(true),0); } } else showScreen("loginScreen");

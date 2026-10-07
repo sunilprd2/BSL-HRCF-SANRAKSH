@@ -36,3 +36,6 @@ Do not delete the old working Apps Script deployment or its backup.
 
 ### Cross-origin note
 The GitHub Pages frontend uses JSONP GET requests because Apps Script Content Service redirects responses to a googleusercontent URL. This avoids the browser CORS/redirect failure when the frontend is hosted on GitHub Pages. Deploy the updated Code.gs as a new version before testing. The PWA sends a JSONP callback name (`prefix`) and the backend now returns the API result as JavaScript when that callback is supplied.
+
+
+Report layout updated: boxed meta cells, clear separator lines, and boxed statistics matching the preferred report design.
