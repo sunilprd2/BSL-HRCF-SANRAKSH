@@ -5,6 +5,8 @@ const today=()=>new Date().toISOString().slice(0,10);
 const shifts=[{name:"A Shift",start:"06:00",end:"14:00",cls:"a"},{name:"B Shift",start:"14:00",end:"22:00",cls:"b"},{name:"C Shift",start:"22:00",end:"06:00",cls:"c"}];
 let session=null,employees=[],areas=[],equipment=[],pending=[];
 let cachedProfile=null;
+let pageHistory=[];
+let currentPage="";
 
 /* =========================================================
    OFFLINE-FIRST STORAGE / AUTOMATIC SYNC
@@ -205,60 +207,64 @@ async function login(){
 }
 function openPasswordSetup(staff){$("setupStaff").value=staff;showScreen("setupScreen");$("setupPass").value="";$("setupConfirm").value="";passwordRules()}
 function passwordRules(){const p=$("setupPass").value;const tests=[["r1",p.length>=8,"Minimum 8 characters"],["r2",/[A-Z]/.test(p),"One capital letter"],["r3",/[a-z]/.test(p),"One small letter"],["r4",/[0-9]/.test(p),"One number"],["r5",/[^A-Za-z0-9]/.test(p),"One special character"]];tests.forEach(t=>{$(t[0]).textContent=(t[1]?"✓ ":"✗ ")+t[2];$(t[0]).className=t[1]?"good":""})}
-async function createPassword(){const s=$("setupStaff").value.trim(),p=$("setupPass").value,c=$("setupConfirm").value;if(p!==c){setMessage("setupMsg","Passwords do not match.");return}try{const r=await api("setFirstPassword",{staffNo:s,password:p});if(!r.success){setMessage("setupMsg",r.message);return}const l=await api("login",{staffNo:s,password:p});session=l;localStorage.setItem("sanrakshSession",JSON.stringify(l));startIdleTimer();await openProfile(true)}catch(e){setMessage("setupMsg","Connection error.")}}
+async function createPassword(){const s=$("setupStaff").value.trim(),p=$("setupPass").value,c=$("setupConfirm").value;if(p!==c){setMessage("setupMsg","Passwords do not match.");return}try{const r=await api("setFirstPassword",{staffNo:s,password:p});if(!r.success){setMessage("setupMsg",r.message);return}const l=await api("login",{staffNo:s,password:p});session=l;localStorage.setItem("sanrakshSession",JSON.stringify(l));await openProfile(true)}catch(e){setMessage("setupMsg","Connection error.")}}
 async function newUser(){const s=prompt("Enter your 6 digit Staff No:");if(!s)return;if(!/^\d{6}$/.test(s)){alert("Staff No must be exactly 6 digits.");return}try{const r=await api("newUser",{staffNo:s});if(!r.success){alert(r.message||"Staff No not available.");return}$("loginStaffNo").value=s;$("loginPassword").value="";openPasswordSetup(s)}catch(e){alert("Connection error.")}}
 async function forgot(){showScreen("forgotScreen");$("forgotStaff").value=$("loginStaffNo").value}
 async function resetPassword(){const s=$("forgotStaff").value.trim();try{const r=await api("requestPasswordReset",{staffNo:s});setMessage("forgotMsg",r.message||"Request submitted.",!!r.success)}catch(e){setMessage("forgotMsg","Connection error.")}}
 
 async function openProfile(afterLogin=false, returnPage=null){
-  if(afterLogin){
-    try{
-      const cached=await cacheGet("profile:"+session.staffNo,null);
-      const known=cached||session;
-      const has=!!(known?.department&&known?.mobile&&known?.employeeType&&known?.designation);
-      if(has){
-        session={...session,name:known.name||session.name||"",email:known.email||session.email||"",department:known.department,mobile:known.mobile,employeeType:known.employeeType,designation:known.designation};
-        localStorage.setItem("sanrakshSession",JSON.stringify(session));
-        startIdleTimer(); home();
-        api("profile",{staffNo:session.staffNo},"GET").then(p=>{
-          if(p){cachedProfile=p;cachePut("profile:"+session.staffNo,p);session={...session,name:p.name||session.name||"",email:p.email||session.email||"",department:p.department||session.department,mobile:p.mobile||session.mobile,employeeType:p.employeeType||session.employeeType,designation:p.designation||session.designation};localStorage.setItem("sanrakshSession",JSON.stringify(session));}
-        }).catch(()=>{});
-        return;
-      }
-    }catch(e){}
+  const sessionHasDetails=!!(session?.department&&session?.mobile&&session?.employeeType&&session?.designation);
+  if(afterLogin && sessionHasDetails && !returnPage){
+    home();
+    return;
   }
   showScreen("profileScreen");
   $("profileStaffNo").value=session.staffNo||"";
   setMessage("profileMsg","Loading saved details...",true);
   try{
     const p=await api("profile",{staffNo:session.staffNo},"GET");
-    cachedProfile=p||{}; if(p) await cachePut("profile:"+session.staffNo,p);
-    $("profileName").value=p.name||session.name||""; $("profileEmail").value=p.email||session.email||"";
+    cachedProfile=p||{};
+    $("profileName").value=p.name||session.name||"";
+    $("profileEmail").value=p.email||session.email||"";
     const ds=p.department||"",ty=p.employeeType||"",dg=p.designation||"",mob=p.mobile||"";
     const deps=p.departments||["Electrical","Mechanical","Operation","Others"];
     $("profileDepartment").innerHTML='<option value="">Select Department</option>'+deps.map(x=>`<option>${esc(x)}</option>`).join("");
     $("profileDepartment").value=ds; $("profileType").value=ty; loadDesignations(); $("profileDesignation").value=dg; $("profileMobile").value=mob;
-    const has=!!(p.department&&p.mobile&&p.employeeType&&p.designation); $("profileHomeBtn").disabled=!has;
-    if(afterLogin&&has){home();return;}
+    const has=!!(p.department&&p.mobile&&p.employeeType&&p.designation);
+    $("profileHomeBtn").disabled=!has;
+    if(afterLogin && has){
+      home();
+      return;
+    }
     setMessage("profileMsg",has?"Saved employee details loaded. You may edit your details here.":"Please complete your employee details before entering the system.",true);
     window.__profileReturnPage=returnPage;
   }catch(e){
     const has=!!(session?.department&&session?.mobile&&session?.employeeType&&session?.designation);
     if(has){
-      $("profileName").value=session.name||"";$("profileEmail").value=session.email||"";
+      $("profileName").value=session.name||""; $("profileEmail").value=session.email||"";
       $("profileDepartment").innerHTML='<option value="">Select Department</option>'+["Electrical","Mechanical","Operation","Others"].map(x=>`<option>${esc(x)}</option>`).join("");
-      $("profileDepartment").value=session.department;$("profileType").value=session.employeeType;loadDesignations();$("profileDesignation").value=session.designation;$("profileMobile").value=session.mobile;$("profileHomeBtn").disabled=false;
-      if(afterLogin){home();return;} window.__profileReturnPage=returnPage;setMessage("profileMsg","Offline mode: using saved Employee Details.",true);
+      $("profileDepartment").value=session.department; $("profileType").value=session.employeeType; loadDesignations(); $("profileDesignation").value=session.designation; $("profileMobile").value=session.mobile; $("profileHomeBtn").disabled=false;
+      if(afterLogin){home();return;}
+      window.__profileReturnPage=returnPage;
+      setMessage("profileMsg","Offline mode: using saved Employee Details.",true);
     }else setMessage("profileMsg","Employee Details are not cached. Connect to internet once to initialize offline mode.");
   }
 }
-function loadDesignations(){const t=$("profileType").value;const d={Executive:["Assistant Manager","Manager","Senior Manager","Assistant General Manager (AGM)","Deputy General Manager (DGM)"],"Non-Executive":["Jr. Engineer","Engineering Associate","Jr. Engineering Associate","Technical Associate"],"Contract Worker":["Contract Worker"]}[t]||[];$("profileDesignation").innerHTML='<option value="">Select Designation</option>'+d.map(x=>`<option>${esc(x)}</option>`).join("")}
-async function saveProfile(){const details={staffNo:session.staffNo,sessionToken:session.sessionToken,name:$("profileName").value,department:$("profileDepartment").value,mobile:$("profileMobile").value.trim(),employeeType:$("profileType").value,designation:$("profileDesignation").value,email:$("profileEmail").value};if(!details.department||!/^\d{10}$/.test(details.mobile)||!details.employeeType||!details.designation){setMessage("profileMsg","Please complete all employee details correctly.");return}try{const r=await api("saveProfile",{details});if(!r.success){setMessage("profileMsg",r.message);return}cachedProfile=r;await cachePut("profile:"+session.staffNo,r);session={...session,name:r.name,department:r.department,mobile:r.mobile,employeeType:r.employeeType,designation:r.designation};localStorage.setItem("sanrakshSession",JSON.stringify(session));setMessage("profileMsg","Employee details saved successfully.",true);$("profileHomeBtn").disabled=false;const back=window.__profileReturnPage;window.__profileReturnPage=null;setTimeout(()=>back?openPage(back):home(),500)}catch(e){setMessage("profileMsg","Connection error.")}}
+function loadDesignations(){const t=$("profileType").value;const d={Executive:["Junior Manager","Assistant Manager","Manager","Senior Manager","Assistant General Manager (AGM)","Deputy General Manager (DGM)"],"Non-Executive":["Jr. Engineer","Engineering Associate","Jr. Engineering Associate","Technical Associate"],"Contract Worker":["Contract Worker"]}[t]||[];$("profileDesignation").innerHTML='<option value="">Select Designation</option>'+d.map(x=>`<option>${esc(x)}</option>`).join("")}
+async function saveProfile(){const details={staffNo:session.staffNo,sessionToken:session.sessionToken,name:$("profileName").value,department:$("profileDepartment").value,mobile:$("profileMobile").value.trim(),employeeType:$("profileType").value,designation:$("profileDesignation").value,email:$("profileEmail").value};if(!details.department||!/^\d{10}$/.test(details.mobile)||!details.employeeType||!details.designation){setMessage("profileMsg","Please complete all employee details correctly.");return}try{const r=await api("saveProfile",{details});if(!r.success){setMessage("profileMsg",r.message);return}cachedProfile=r;session={...session,name:r.name,department:r.department,mobile:r.mobile,employeeType:r.employeeType,designation:r.designation};localStorage.setItem("sanrakshSession",JSON.stringify(session));setMessage("profileMsg","Employee details saved successfully.",true);$("profileHomeBtn").disabled=false;const back=window.__profileReturnPage;window.__profileReturnPage=null;setTimeout(()=>back?openPage(back):home(),500)}catch(e){setMessage("profileMsg","Connection error.")}}
 function continueHome(){window.__profileReturnPage=null;home()}
-function logout(auto=false){clearTimeout(idleTimer);clearInterval(idleCheckTimer);localStorage.removeItem("sanrakshSession");localStorage.removeItem("sanrakshLastPage");localStorage.removeItem("sanrakshLastActivity");session=null;location.reload()}
+function logout(auto=false){clearTimeout(idleTimer);localStorage.removeItem("sanrakshSession");localStorage.removeItem("sanrakshLastPage");localStorage.removeItem("sanrakshLastActivity");session=null;location.reload()}
 
 function statusPill(s){const c=String(s||"").toLowerCase();return `<span class="status-pill ${c}">${esc(s||"")}</span>`}
-function renderShell(page,title,sub=""){localStorage.setItem("sanrakshLastPage",page);touchActivity();showScreen("appScreen");document.querySelectorAll("#nav button").forEach(b=>b.classList.toggle("active",b.dataset.page===page));$("topTitle").innerHTML=`${esc(title)}<br><small>${esc(sub)}</small>`;$("topUser").textContent=session?.name||session?.staffNo||"●"}
+function renderShell(page,title,sub=""){
+ localStorage.setItem("sanrakshLastPage",page);
+ currentPage=page;
+ touchActivity();
+ showScreen("appScreen");
+ document.querySelectorAll("#nav button").forEach(b=>b.classList.toggle("active",b.dataset.page===page));
+ $("topTitle").innerHTML=`${esc(title)}<br><small>${esc(sub)}</small>`;
+ $("topUser").textContent=session?.name||session?.staffNo||"●";
+}
 function home(){
  renderShell("home","BSL (HRCF) - SANRAKSH","Maintenance Log System");
  $("content").innerHTML='<div class="loading panel">Loading dashboard...</div>';
@@ -268,13 +274,26 @@ function home(){
   if(Array.isArray(emps))cachePut("employees",employees);
   const now=currentShift();const c=(Array.isArray(crew)?crew:[]).find(x=>x.shiftName===now)||{};
   $("content").innerHTML=`<h1 class="page-title">Home</h1>
-  <div class="home-hero"><h2>Welcome, ${esc(session?.name||session?.staffNo||"Employee")}</h2><p>${esc(session?.designation||"Employee")}</p><p><b>${now}</b> • ${shifts.find(x=>x.name===now)?.start} - ${shifts.find(x=>x.name===now)?.end} • ${today()}</p></div>
-  <div class="shift-grid">${shifts.map(s=>{const x=(Array.isArray(crew)?crew:[]).find(y=>y.shiftName===s.name)||{};const emp=employees.find(e=>String(e.name).toLowerCase()===String(x.shiftIncharge||"").toLowerCase());const st=shiftState(s.name);return `<div class="shift-card ${s.cls} ${st==="Running"?"active":""}" onclick="shiftDetailsPage('${s.name}')"><h3>${s.name.toUpperCase()}</h3><div class="time">${s.start} - ${s.end}</div><div class="incharge">${esc(x.shiftIncharge||"Not entered")}</div><div class="phone">☎ ${esc(emp?.mobile||"")}</div><span class="shift-status ${st.toLowerCase()}">${st}</span></div>`}).join("")}</div>
-  <div class="current-card ${shifts.find(x=>x.name===now)?.cls||"a"}"><h3>Current Shift Details (${now})</h3><div class="current-grid"><div><b>Shift In-charge</b><span>${esc(c.shiftIncharge||"Not entered")}</span></div><div><b>Line In-charge</b><span>${esc(c.lineIncharge||"Not entered")}</span></div><div><b>Crew</b><span>Total ${c.totalCrew||0} • BSL ${c.bslEmployees||0} • Contract ${c.contractWorkers||0}</span></div></div></div>
+  <div class="home-hero"><h2>Welcome, ${esc(session?.name||session?.staffNo||"Employee")}</h2><p>${esc(session?.designation||session?.employeeType||"Employee")}</p><p><b>${now}</b> • ${shifts.find(x=>x.name===now)?.start} - ${shifts.find(x=>x.name===now)?.end} • ${today()}</p></div>
+  <div class="shift-grid">${shifts.map(s=>{const x=(Array.isArray(crew)?crew:[]).find(y=>y.shiftName===s.name)||{};const emp=employees.find(e=>String(e.name).toLowerCase()===String(x.shiftIncharge||"").toLowerCase());const st=shiftState(s.name);return `<div class="shift-card ${s.cls} ${st==="Running"?"active":""}" onclick="openPage('shifts')"><h3>${s.name.toUpperCase()}</h3><div class="time">${s.start} - ${s.end}</div><div class="incharge">${esc(x.shiftIncharge||"Not entered")}</div><div class="phone">☎ ${esc(emp?.mobile||"")}</div><span class="shift-status ${st.toLowerCase()}">${st}</span></div>`}).join("")}</div>
+  <div class="current-card"><h3>Current Shift Details (${now})</h3><div class="current-grid"><div><b>Shift In-charge</b><span>${esc(c.shiftIncharge||"Not entered")}</span></div><div><b>Line In-charge</b><span>${esc(c.lineIncharge||"Not entered")}</span></div><div><b>Crew</b><span>Total ${c.totalCrew||0} • BSL ${c.bslEmployees||0} • Contract ${c.contractWorkers||0}</span></div></div></div>
   <div class="quick-grid"><button class="q-blue" onclick="openPage('addLog')"><span class="quick-icon"><svg viewBox="0 0 64 64" aria-hidden="true"><path fill="#fff" d="M13 7h29l12 12v38H13z"/><path fill="#1685ff" d="M40 7v15h14z"/><path fill="#1685ff" d="M22 27h19v4H22zm0 9h19v4H22zm0 9h12v4H22z"/><circle cx="48" cy="46" r="12" fill="#20d447"/><path fill="#fff" d="M46 39h4v5h5v4h-5v5h-4v-5h-5v-4h5z"/></svg></span><span>Add Log</span></button><button class="q-green" onclick="openPage('logs')"><span class="quick-icon"><svg viewBox="0 0 64 64" aria-hidden="true"><path fill="#fff" d="M11 7h34l9 9v41H11z"/><path fill="#1787ff" d="M43 7v12h11z"/><rect x="19" y="25" width="7" height="7" rx="2" fill="#1685ff"/><rect x="30" y="26" width="17" height="4" rx="2" fill="#1b4e91"/><rect x="19" y="36" width="7" height="7" rx="2" fill="#20d447"/><rect x="30" y="37" width="17" height="4" rx="2" fill="#1b4e91"/><rect x="19" y="47" width="7" height="7" rx="2" fill="#ffc21a"/><rect x="30" y="48" width="17" height="4" rx="2" fill="#1b4e91"/></svg></span><span>View Logs</span></button><button class="q-orange" onclick="openPage('reports')"><span class="quick-icon"><svg viewBox="0 0 64 64" aria-hidden="true"><path fill="#fff" d="M10 7h34l10 10v40H10z"/><path fill="#1685ff" d="M43 7v13h11z"/><rect x="18" y="40" width="7" height="12" rx="2" fill="#1685ff"/><rect x="29" y="33" width="7" height="19" rx="2" fill="#20d447"/><rect x="40" y="25" width="7" height="27" rx="2" fill="#ff3030"/><path stroke="#17406b" stroke-width="4" d="M17 55h32"/></svg></span><span>Reports</span></button><button class="q-purple" onclick="openPage('employees')"><span class="quick-icon"><svg viewBox="0 0 64 64" aria-hidden="true"><circle cx="32" cy="17" r="9" fill="#ffd6b0"/><path fill="#ffb21a" d="M20 15q2-12 12-12t12 12H20z"/><path fill="#1685ff" d="M16 58q2-18 16-18t16 18z"/><path fill="#0874df" d="M24 40h16v8H24z"/><path fill="#fff" d="M38 47h10v5H38z"/></svg></span><span>Employee Details</span></button><button class="q-cyan" onclick="openPage('shifts')"><span class="quick-icon"><svg viewBox="0 0 64 64" aria-hidden="true"><rect x="10" y="10" width="42" height="45" rx="6" fill="#fff"/><path fill="#ff3b30" d="M10 16a6 6 0 0 1 6-6h30a6 6 0 0 1 6 6v8H10z"/><path fill="#1685ff" d="M18 4h5v12h-5zm23 0h5v12h-5z"/><rect x="18" y="29" width="7" height="7" rx="2" fill="#20d447"/><rect x="29" y="29" width="7" height="7" rx="2" fill="#ffc21a"/><rect x="40" y="29" width="7" height="7" rx="2" fill="#19b9d0"/><circle cx="45" cy="47" r="12" fill="#1685ff"/><circle cx="45" cy="47" r="7" fill="#fff"/><path stroke="#ff3030" stroke-width="3" d="M45 47v-5m0 5 4 3"/></svg></span><span>Shift Details</span></button><button class="q-info" onclick="openPage('about')"><span class="quick-icon"><svg viewBox="0 0 64 64" aria-hidden="true"><circle cx="32" cy="32" r="25" fill="#1685ff"/><circle cx="32" cy="32" r="21" fill="#0d6ee8"/><circle cx="32" cy="20" r="4.5" fill="#fff"/><rect x="28" y="27" width="8" height="22" rx="4" fill="#fff"/></svg></span><span>About</span></button><button class="q-sync" onclick="openPage('sync')"><span class="quick-icon"><svg viewBox="0 0 64 64" aria-hidden="true"><path fill="#fff" d="M17 45a13 13 0 0 1 1-26 17 17 0 0 1 32 5 11 11 0 0 1-1 22z"/><path fill="none" stroke="#20d447" stroke-width="7" stroke-linecap="round" d="M22 37a15 15 0 0 0 25 1"/><path fill="none" stroke="#1685ff" stroke-width="7" stroke-linecap="round" d="M42 27a15 15 0 0 0-25-1"/><path fill="#20d447" d="m45 31 9 5-10 5z"/><path fill="#1685ff" d="m19 33-9-5 10-5z"/></svg></span><span>Sync Data</span></button></div>`;;
  }).catch(()=>{$("content").innerHTML='<div class="panel">Unable to load dashboard.</div>'})
 }
-function openPage(p){if(p==="home")home();else if(p==="addLog")addLogPage();else if(p==="logs")logsPage();else if(p==="employees")employeesPage();else if(p==="shifts")shiftDetailsPage();else if(p==="reports")reportsPage();else if(p==="about")aboutPage();else if(p==="sync")syncPage();$("sidebar").classList.remove("open")}
+function openPage(p,fromBack=false){
+ const cur=localStorage.getItem("sanrakshLastPage")||currentPage||"home";
+ if(!fromBack && cur!==p && cur!=="profile"){
+   pageHistory=pageHistory.filter(x=>x!==p);
+   pageHistory.push(cur);
+ }
+ if(p==="home")home();else if(p==="addLog")addLogPage();else if(p==="logs")logsPage();else if(p==="employees")employeesPage();else if(p==="shifts")shiftDetailsPage();else if(p==="reports")reportsPage();else if(p==="about")aboutPage();else if(p==="sync")syncPage();
+ $("sidebar").classList.remove("open");
+}
+
+function goBackTab(){
+ const prev=pageHistory.pop()||"home";
+ openPage(prev,true);
+}
 
 async function shiftDetailsPage(forceShift=""){
  renderShell("shifts","Shift Details","A / B / C shifts");
@@ -515,14 +534,10 @@ async function manualSync(){
  else alert("No pending records.");
 }
 
-const IDLE_LIMIT=10*60*1000; let idleTimer=null; let idleCheckTimer=null;
-function checkIdleTimeout(){if(!session)return;const last=Number(localStorage.getItem("sanrakshLastActivity")||0);if(last && Date.now()-last>=IDLE_LIMIT)logout(true)}
-function startIdleTimer(){if(!session)return;clearTimeout(idleTimer);clearInterval(idleCheckTimer);if(!localStorage.getItem("sanrakshLastActivity"))localStorage.setItem("sanrakshLastActivity",String(Date.now()));checkIdleTimeout();if(!session)return;const last=Number(localStorage.getItem("sanrakshLastActivity")||Date.now());idleTimer=setTimeout(checkIdleTimeout,Math.max(1000,IDLE_LIMIT-(Date.now()-last)+250));idleCheckTimer=setInterval(checkIdleTimeout,30000)}
-function touchActivity(){if(!session)return;localStorage.setItem("sanrakshLastActivity",String(Date.now()));startIdleTimer()}
+const IDLE_LIMIT=10*60*1000; let idleTimer=null;
+function touchActivity(){if(!session)return;const now=Date.now();localStorage.setItem("sanrakshLastActivity",String(now));clearTimeout(idleTimer);idleTimer=setTimeout(()=>{if(Date.now()-Number(localStorage.getItem("sanrakshLastActivity")||0)>=IDLE_LIMIT)logout(true)},IDLE_LIMIT+500)}
 ["click","touchstart","keydown","scroll","pointerdown"].forEach(ev=>window.addEventListener(ev,()=>touchActivity(),{passive:true}));
-document.addEventListener("visibilitychange",()=>{if(session&&document.visibilityState==="visible")checkIdleTimeout()});
-window.addEventListener("pageshow",()=>{if(session)checkIdleTimeout()});
-function restoreSession(){try{const raw=localStorage.getItem("sanrakshSession");if(!raw)return null;const x=JSON.parse(raw);if(!x?.staffNo)return null;const last=Number(localStorage.getItem("sanrakshLastActivity")||0);if(last&&Date.now()-last>=IDLE_LIMIT){localStorage.removeItem("sanrakshSession");return null}session=x;startIdleTimer();return x}catch(e){return null}}
+function restoreSession(){try{const raw=localStorage.getItem("sanrakshSession");if(!raw)return null;const x=JSON.parse(raw);if(!x?.staffNo)return null;const last=Number(localStorage.getItem("sanrakshLastActivity")||0);if(last && Date.now()-last>=IDLE_LIMIT){localStorage.removeItem("sanrakshSession");return null}session=x;touchActivity();return x}catch(e){return null}}
 
 document.addEventListener("DOMContentLoaded",()=>{
   const themeToggle=$("themeToggle");
@@ -551,6 +566,7 @@ document.addEventListener("DOMContentLoaded",()=>{
      }
    });
  }$("newUserBtn").onclick=newUser;$("forgotBtn").onclick=forgot;$("resetBtn").onclick=resetPassword;$("forgotBack").onclick=()=>showScreen("loginScreen");$("setupBack").onclick=()=>showScreen("loginScreen");$("setupPass").oninput=passwordRules;$("createPasswordBtn").onclick=createPassword;$("profileType").onchange=loadDesignations;$("saveProfileBtn").onclick=saveProfile;$("profileHomeBtn").onclick=continueHome;$("logoutBtn").onclick=logout;$("menuBtn").onclick=()=>$("sidebar").classList.toggle("open");document.querySelectorAll("#nav button").forEach(b=>b.onclick=()=>openPage(b.dataset.page));
+ $("backTabBtn").onclick=goBackTab;
  openOfflineDb().then(()=>{updateSyncBadge();if(navigator.onLine)setTimeout(syncPending,700)}).catch(()=>{});
  const restored=restoreSession();
  if(restored){ if(restored.department&&restored.mobile&&restored.employeeType&&restored.designation){ const p=localStorage.getItem("sanrakshLastPage")||"home"; setTimeout(()=>openPage(p),0); } else { setTimeout(()=>openProfile(true),0); } } else showScreen("loginScreen");
