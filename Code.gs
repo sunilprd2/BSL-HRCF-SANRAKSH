@@ -94,7 +94,74 @@ function apiDispatch_(action, p) {
   if (action === 'saveShiftCrew') return saveShiftCrewDetails(parseObjectParam_(p.details));
   if (action === 'saveLog') return saveMaintenanceLogPwa_(parseObjectParam_(p.log));
   if (action === 'updateLog') return updateMaintenanceLogPwa_(parseObjectParam_(p.log), p.sessionToken || '', p.staffNo || '');
+  if (action === 'supplyPoints') return getSupplyPoints_(p.staffNo, p.sessionToken);
+  if (action === 'saveSupplyPoint') return saveSupplyPoint_(parseObjectParam_(p.point), p.staffNo, p.sessionToken);
   throw new Error('Unknown API action: ' + action);
+}
+
+
+/* PRIVATE SUPPLY POINT DIRECTORY: Staff No 806432 only */
+var SUPPLY_POINTS_SHEET = 'Supply Point Directory';
+var SUPPLY_POINT_HEADERS = [
+  'Serial No.',
+  'Equipment / Supply Point Name',
+  'Feeds To (Consumer / Equipment)',
+  'Main Supply Source',
+  'Exact Location',
+  'Description'
+];
+
+function requireSupplyPointAdmin_(staffNo, sessionToken) {
+  var actor = sessionStaffNo_(sessionToken);
+  if (!actor || actor !== ADMIN_STAFF_NO || normalize_(staffNo) !== ADMIN_STAFF_NO) {
+    throw new Error('Unauthorized: Supply Point Directory is available only to Staff No. 806432.');
+  }
+}
+function getOrCreateSupplyPointSheet_() {
+  var ss = getSS_();
+  var sheet = ss.getSheetByName(SUPPLY_POINTS_SHEET);
+  if (!sheet) sheet = ss.insertSheet(SUPPLY_POINTS_SHEET);
+  if (sheet.getLastRow() === 0) {
+    sheet.getRange(1, 1, 1, SUPPLY_POINT_HEADERS.length).setValues([SUPPLY_POINT_HEADERS]);
+    sheet.setFrozenRows(1);
+  }
+  return sheet;
+}
+function getSupplyPoints_(staffNo, sessionToken) {
+  try {
+    requireSupplyPointAdmin_(staffNo, sessionToken);
+    var sheet = getOrCreateSupplyPointSheet_();
+    var last = sheet.getLastRow();
+    if (last < 2) return {success:true, points:[]};
+    var rows = sheet.getRange(2, 1, last - 1, SUPPLY_POINT_HEADERS.length).getDisplayValues();
+    var points = rows.filter(function(r){ return r.some(function(v){return normalize_(v) !== '';}); })
+      .map(function(r, i) {
+        return {serialNo:normalize_(r[0]), name:normalize_(r[1]), feedsTo:normalize_(r[2]),
+          mainSupplySource:normalize_(r[3]), exactLocation:normalize_(r[4]),
+          description:normalize_(r[5]), rowNumber:i + 2};
+      });
+    return {success:true, points:points};
+  } catch (e) { return {success:false, message:String(e.message || e), points:[]}; }
+}
+function saveSupplyPoint_(point, staffNo, sessionToken) {
+  try {
+    requireSupplyPointAdmin_(staffNo, sessionToken);
+    point = point || {};
+    var name = normalize_(point.name);
+    if (!name) return {success:false, message:'Equipment / Supply Point Name is required.'};
+    var sheet = getOrCreateSupplyPointSheet_();
+    var last = sheet.getLastRow();
+    var rowNumber = Number(point.rowNumber || 0);
+    var values = [normalize_(point.serialNo), name, normalize_(point.feedsTo),
+      normalize_(point.mainSupplySource), normalize_(point.exactLocation), normalize_(point.description)];
+    if (rowNumber >= 2 && rowNumber <= last) {
+      sheet.getRange(rowNumber, 1, 1, values.length).setValues([values]);
+    } else {
+      values[0] = values[0] || ('SP-' + String(Math.max(1, last)).padStart(4, '0'));
+      sheet.appendRow(values);
+    }
+    return {success:true, message:'Supply point saved.'};
+  } catch (e) { return {success:false, message:String(e.message || e)}; }
 }
 
 function getDailyShiftReport_(date, shift) {

@@ -258,6 +258,7 @@ function statusPill(s){const c=String(s||"").toLowerCase();return `<span class="
 function renderShell(page,title,sub=""){
  localStorage.setItem("sanrakshLastPage",page);
  currentPage=page;
+ updatePrivateNav();
  touchActivity();
  showScreen("appScreen");
  document.querySelectorAll("#nav button").forEach(b=>b.classList.toggle("active",b.dataset.page===page));
@@ -280,7 +281,7 @@ function home(){
  }).catch(()=>{$("content").innerHTML='<div class="panel">Unable to load dashboard.</div>'})
 }
 function openPage(p){
- if(p==="home")home();else if(p==="addLog")addLogPage();else if(p==="logs")logsPage();else if(p==="employees")employeesPage();else if(p==="shifts")shiftDetailsPage();else if(p==="reports")reportsPage();else if(p==="about")aboutPage();else if(p==="sync")syncPage();
+ if(p==="home")home();else if(p==="addLog")addLogPage();else if(p==="logs")logsPage();else if(p==="employees")employeesPage();else if(p==="shifts")shiftDetailsPage();else if(p==="reports")reportsPage();else if(p==="about")aboutPage();else if(p==="sync")syncPage();else if(p==="supplyPoints")supplyPointsPage();
  $("sidebar").classList.remove("open");
 }
 
@@ -534,6 +535,72 @@ function saveReportPdf(){
  const restoreTitle=()=>{document.title=old;window.removeEventListener("afterprint",restoreTitle)};
  window.addEventListener("afterprint",restoreTitle,{once:true});
  window.print();
+}
+
+/* PRIVATE SUPPLY POINT DIRECTORY — Staff No 806432 only */
+const SUPPLY_POINT_CACHE_KEY = "private-supply-points-806432";
+function isSupplyPointAdmin(){ return String(session?.staffNo || "") === "806432"; }
+function updatePrivateNav(){
+  const b=$("supplyPointsNav");
+  if(b)b.classList.toggle("hidden",!isSupplyPointAdmin());
+}
+async function supplyPointsPage(){
+  if(!isSupplyPointAdmin()){alert("This feature is available only to Staff No. 806432.");home();return;}
+  renderShell("supplyPoints","Supply Point Directory","Private directory • Staff No. 806432 only");
+  $("content").innerHTML='<div class="loading panel">Loading supply points...</div>';
+  let points=await cacheGet(SUPPLY_POINT_CACHE_KEY,[]);
+  if(navigator.onLine){
+    try{
+      const r=await api("supplyPoints",{staffNo:session.staffNo,sessionToken:session.sessionToken},"GET");
+      if(!r.success)throw new Error(r.message||"Unable to load directory");
+      points=Array.isArray(r.points)?r.points:[];
+      await cachePut(SUPPLY_POINT_CACHE_KEY,points);
+    }catch(e){/* Use cached directory while offline/server unavailable. */}
+  }
+  window.__supplyPoints=points;
+  renderSupplyPoints(points);
+}
+function renderSupplyPoints(points){
+  const offline=!navigator.onLine;
+  $("content").innerHTML=`
+    <h1 class="page-title">Supply Point Directory</h1>
+    <div class="panel supply-private-note">🔒 Private — Staff No. 806432 only. ${offline?'<b>Offline: showing saved records.</b>':'Saved records are cached for offline searching.'}</div>
+    <div class="panel toolbar supply-search">
+      <input id="supplySearch" placeholder="Search name, feeds to, source, location or description..." oninput="filterSupplyPoints()">
+      <button class="primary" onclick="filterSupplyPoints()">Search</button>
+      <button class="secondary" onclick="resetSupplySearch()">Reset</button>
+      <button class="primary" onclick="newSupplyPoint()" ${offline?'disabled title="Connect to internet to add or edit records"':''}>+ Add Supply Point</button>
+    </div>
+    <div id="supplyPointResults" class="panel table-wrap"></div>
+    <div id="supplyPointEditor"></div>`;
+  filterSupplyPoints();
+}
+function filterSupplyPoints(){
+  const q=String($("supplySearch")?.value||"").trim().toLowerCase();
+  const xs=(window.__supplyPoints||[]).filter(p=>[p.serialNo,p.name,p.feedsTo,p.mainSupplySource,p.exactLocation,p.description].some(v=>String(v||"").toLowerCase().includes(q)));
+  const box=$("supplyPointResults"); if(!box)return;
+  if(!xs.length){box.innerHTML='<div class="empty-state">No matching supply points found.</div>';return;}
+  box.innerHTML=`<table class="data-table"><thead><tr><th>Serial No.</th><th>Equipment / Supply Point</th><th>Feeds To</th><th>Main Supply Source</th><th>Exact Location</th><th>Description</th><th>Action</th></tr></thead><tbody>${xs.map(p=>`<tr><td>${esc(p.serialNo)}</td><td>${esc(p.name)}</td><td>${esc(p.feedsTo)}</td><td>${esc(p.mainSupplySource)}</td><td>${esc(p.exactLocation)}</td><td>${esc(p.description)}</td><td><button class="secondary" onclick="editSupplyPoint('${esc(p.serialNo)}')" ${!navigator.onLine?'disabled':''}>Edit</button></td></tr>`).join("")}</tbody></table>`;
+}
+function resetSupplySearch(){if($("supplySearch"))$("supplySearch").value="";filterSupplyPoints();}
+function newSupplyPoint(){if(isSupplyPointAdmin()&&navigator.onLine)showSupplyPointEditor({serialNo:"",name:"",feedsTo:"",mainSupplySource:"",exactLocation:"",description:"",rowNumber:0});}
+function editSupplyPoint(serialNo){if(!isSupplyPointAdmin()||!navigator.onLine)return;const p=(window.__supplyPoints||[]).find(x=>String(x.serialNo)===String(serialNo));if(p)showSupplyPointEditor(p);}
+function showSupplyPointEditor(p){
+  $("supplyPointEditor").innerHTML=`<div class="panel supply-editor"><h2>${p.rowNumber?"Edit Supply Point":"Add Supply Point"}</h2><div class="form-grid">
+    <div><label>Equipment / Supply Point Name *</label><input id="spName" value="${esc(p.name)}" required></div>
+    <div><label>Feeds To (Consumer / Equipment)</label><input id="spFeeds" value="${esc(p.feedsTo)}"></div>
+    <div><label>Main Supply Source</label><input id="spSource" value="${esc(p.mainSupplySource)}"></div>
+    <div><label>Exact Location</label><input id="spLocation" value="${esc(p.exactLocation)}"></div>
+    <div class="span-2"><label>Description</label><textarea id="spDescription" rows="3">${esc(p.description)}</textarea></div>
+  </div><div class="form-actions"><button class="secondary" onclick="$('supplyPointEditor').innerHTML=''">Cancel</button><button class="primary" onclick="saveSupplyPoint('${esc(p.serialNo)}',${Number(p.rowNumber||0)})">Save Supply Point</button></div></div>`;
+}
+async function saveSupplyPoint(serialNo,rowNumber){
+  if(!isSupplyPointAdmin()){alert("Unauthorized.");return;}
+  if(!navigator.onLine){alert("Connect to internet to save changes. Saved records remain searchable offline.");return;}
+  const point={serialNo,rowNumber,name:$("spName").value.trim(),feedsTo:$("spFeeds").value.trim(),mainSupplySource:$("spSource").value.trim(),exactLocation:$("spLocation").value.trim(),description:$("spDescription").value.trim()};
+  if(!point.name){alert("Enter Equipment / Supply Point Name.");return;}
+  try{const r=await api("saveSupplyPoint",{point,staffNo:session.staffNo,sessionToken:session.sessionToken});if(!r.success){alert(r.message||"Save failed.");return;}alert(r.message||"Saved.");await supplyPointsPage();}
+  catch(e){alert("Unable to save. Please check your connection.");}
 }
 function aboutPage(){renderShell("about","About","BSL (HRCF) - SANRAKSH");$("content").innerHTML='<div class="about-card"><img src="sanraksh-icon.png"><h2>BSL (HRCF) SANRAKSH Maintenance Portal</h2><div class="about-version">Version 1.0.0 | Enterprise Edition</div><div class="about-grid"><section><h3>◉ Purpose</h3><p>A digitized, localized web platform designed exclusively for the Bokaro Steel Plant (BSL) HRCF department to track maintenance logs, monitor shift crews, and generate daily reports without relying on manual paperwork.</p></section><section><h3>⚙ Key Features</h3><ul><li>Real-time Shift Status &amp; Tracking</li><li>Secure Login with Strike-Lockout</li><li>Live Google Sheets Database Integration</li><li>One-click A4 Printable Reports</li></ul></section></div><div class="about-developer">&lt;/&gt; Developed &amp; Architected by Sunil Kumar Parida | Junior Engineer | HRCF Department<br>Steel Authority of India Limited (SAIL), Bokaro Steel Plant (BSL)<br>Mobile: 7979835047 | Email: sunilkumarparida.sail@gmail.com</div><p class="about-feedback">Feel free to give your valuable feedback and suggestions to improve this website.</p></div>'}
 async function syncPage(){

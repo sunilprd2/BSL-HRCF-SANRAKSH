@@ -1,4 +1,4 @@
-const CACHE = "sanraksh-v11-icons";
+const CACHE = "sanraksh-v16-supply-points";
 const ASSETS = [
   "./",
   "./index.html",

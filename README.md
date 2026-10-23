@@ -39,3 +39,13 @@ The GitHub Pages frontend uses JSONP GET requests because Apps Script Content Se
 
 
 Report layout updated: boxed meta cells, clear separator lines, and boxed statistics matching the preferred report design.
+
+
+## Private Supply Point Directory
+- Only Staff No. `806432` can see or use this feature.
+- The backend validates the active session token and Staff No. on every read/write.
+- If the `Supply Point Directory` sheet does not exist, it is created automatically with these headers:
+  `Serial No. | Equipment / Supply Point Name | Feeds To (Consumer / Equipment) | Main Supply Source | Exact Location | Description`
+- Previously loaded directory records are cached in IndexedDB so they can be searched offline.
+- Adding/editing records currently requires an internet connection.
+- Equipment Issue Register has intentionally not been added yet.
